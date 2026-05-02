@@ -97,29 +97,31 @@ pub(crate) fn draw_section_label(label: &str, pos: Vec2) {
 }
 
 pub(crate) fn hotkey_badge_width(label: &str) -> f32 {
-    measure_text(label, None, 15, 1.0).width.max(14.0) + 16.0
+    (measure_text(label, None, 15, 1.0).width.max(14.0) + 16.0).ceil()
 }
 
 pub(crate) fn draw_hotkey_badge(label: &str, pos: Vec2) -> f32 {
     let width = hotkey_badge_width(label);
-    draw_rounded_panel(
-        Rect::new(pos.x, pos.y, width, 24.0),
-        5.0,
-        with_alpha(Color::from_rgba(255, 224, 96, 255), 0.72),
-    );
-    draw_rounded_panel(
-        Rect::new(pos.x + 1.0, pos.y + 1.0, width - 2.0, 22.0),
-        4.0,
+    let rect = Rect::new(pos.x.round(), pos.y.round(), width, 24.0);
+    draw_rectangle(
+        rect.x,
+        rect.y,
+        rect.w,
+        rect.h,
         with_alpha(Color::from_rgba(24, 26, 32, 255), 0.96),
     );
-    let dims = measure_text(label, None, 15, 1.0);
-    draw_text(
-        label,
-        pos.x + (width - dims.width) * 0.5,
-        pos.y + 17.0,
-        15.0,
-        WHITE,
+    draw_rectangle_lines(
+        rect.x + 0.5,
+        rect.y + 0.5,
+        rect.w - 1.0,
+        rect.h - 1.0,
+        1.0,
+        with_alpha(Color::from_rgba(255, 224, 96, 255), 0.82),
     );
+    let dims = measure_text(label, None, 15, 1.0);
+    let text_x = rect.x + ((rect.w - dims.width) * 0.5).round();
+    let text_y = rect.y + ((rect.h + dims.height) * 0.5).round() - 1.0;
+    draw_text(label, text_x, text_y, 15.0, WHITE);
     width
 }
 
@@ -269,30 +271,4 @@ fn clip_text(text: &str, max_width: f32, size: f32) -> String {
         clipped.pop();
     }
     format!("{}...", clipped)
-}
-
-fn draw_rounded_panel(rect: Rect, radius: f32, color: Color) {
-    draw_rectangle(
-        rect.x + radius,
-        rect.y,
-        rect.w - radius * 2.0,
-        rect.h,
-        color,
-    );
-    draw_rectangle(
-        rect.x,
-        rect.y + radius,
-        rect.w,
-        rect.h - radius * 2.0,
-        color,
-    );
-    draw_circle(rect.x + radius, rect.y + radius, radius, color);
-    draw_circle(rect.x + rect.w - radius, rect.y + radius, radius, color);
-    draw_circle(rect.x + radius, rect.y + rect.h - radius, radius, color);
-    draw_circle(
-        rect.x + rect.w - radius,
-        rect.y + rect.h - radius,
-        radius,
-        color,
-    );
 }
