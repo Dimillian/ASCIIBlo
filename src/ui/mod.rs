@@ -2,6 +2,7 @@ mod character;
 mod hud;
 mod inventory;
 mod shop;
+mod skill_book;
 mod trainer;
 mod travel;
 mod widgets;
@@ -20,6 +21,10 @@ pub(crate) fn draw_inventory(game: &Game) {
 
 pub(crate) fn draw_character(game: &Game) {
     character::draw(game);
+}
+
+pub(crate) fn draw_skill_book(game: &Game) {
+    skill_book::draw(game);
 }
 
 pub(crate) fn draw_shop(game: &Game) {

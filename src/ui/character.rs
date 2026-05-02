@@ -2,65 +2,321 @@ use macroquad::prelude::*;
 
 use crate::{game::Game, render::with_alpha};
 
-use super::widgets::{draw_hotkey_hint, draw_modal_backdrop, draw_modal_frame, draw_section_box};
+use super::widgets::{
+    draw_hotkey_hint, draw_modal_backdrop, draw_modal_frame, draw_section_box, wrap_text,
+};
+
+const PANEL: Color = Color::new(10.0 / 255.0, 12.0 / 255.0, 16.0 / 255.0, 0.72);
+const MUTED: Color = Color::new(180.0 / 255.0, 184.0 / 255.0, 190.0 / 255.0, 1.0);
+const GOLD: Color = Color::new(255.0 / 255.0, 224.0 / 255.0, 96.0 / 255.0, 1.0);
+
+struct StatRow {
+    label: &'static str,
+    value: String,
+    detail: String,
+    cursor_index: Option<usize>,
+}
 
 pub(crate) fn draw(game: &Game) {
-    let w = 560.0;
-    let h = 360.0;
+    let w = 960.0;
+    let h = 560.0;
     let x = (screen_width() - w) * 0.5;
     let y = (screen_height() - h) * 0.5;
     draw_modal_backdrop();
     draw_modal_frame(Rect::new(x, y, w, h), "Character");
-    draw_text(
-        &format!(
-            "Stat points {}   Skill points {}",
-            game.player.stats.unspent_stat_points, game.player.stats.unspent_skill_points
-        ),
-        x + 24.0,
-        y + 66.0,
-        20.0,
-        WHITE,
-    );
-    draw_section_box(Rect::new(x + 24.0, y + 88.0, 246.0, 198.0), "Attributes");
-    draw_section_box(Rect::new(x + 290.0, y + 88.0, 246.0, 198.0), "Skills");
-    let rows = [
-        format!("Strength {}", game.player.stats.strength),
-        format!("Agility {}", game.player.stats.agility),
-        format!("Vitality {}", game.player.stats.vitality),
-        format!("Rush rank {}", game.player.rush_rank),
-        format!("Nova rank {}", game.player.nova_rank),
+
+    draw_overview(game, vec2(x + 24.0, y + 70.0));
+
+    let left = Rect::new(x + 24.0, y + 108.0, 246.0, 344.0);
+    let middle = Rect::new(x + 290.0, y + 108.0, 246.0, 344.0);
+    let right = Rect::new(x + 556.0, y + 108.0, 380.0, 344.0);
+    draw_section_box(left, "Attributes");
+    draw_section_box(middle, "Combat");
+    draw_section_box(right, "Details");
+
+    let attribute_rows = vec![
+        StatRow {
+            label: "Strength",
+            value: game.player.stats.strength.to_string(),
+            detail: format!(
+                "Strength grants 2 power per point. Current base strength {} contributes {} power before gear.",
+                game.player.stats.strength,
+                game.player.stats.strength * 2
+            ),
+            cursor_index: Some(0),
+        },
+        StatRow {
+            label: "Agility",
+            value: game.player.stats.agility.to_string(),
+            detail: format!(
+                "Agility raises haste and critical hit chance. Current agility adds {} haste and sets crit chance to {:.0}%.",
+                game.player.stats.agility,
+                game.player.crit_chance() * 100.0
+            ),
+            cursor_index: Some(1),
+        },
+        StatRow {
+            label: "Vitality",
+            value: format!(
+                "{} (+{} gear)",
+                game.player.stats.vitality,
+                game.player.equipment.bonus_vitality()
+            ),
+            detail: format!(
+                "Vitality grants 7 maximum life per point and 1 armor every 2 base points. Gear adds {} vitality.",
+                game.player.equipment.bonus_vitality()
+            ),
+            cursor_index: Some(2),
+        },
+        StatRow {
+            label: "Life",
+            value: format!(
+                "{} / {}",
+                game.player.hp.round() as i32,
+                game.player.max_hp().round() as i32
+            ),
+            detail: "Life is lost when monsters hit you. If it reaches 0, you wake in town and lose some gold."
+                .into(),
+            cursor_index: None,
+        },
+        StatRow {
+            label: "Mana",
+            value: format!(
+                "{} / {}",
+                game.player.mana.round() as i32,
+                game.player.max_mana().round() as i32
+            ),
+            detail: "Mana fuels active skills. Maximum mana rises with level and slowly regenerates over time."
+                .into(),
+            cursor_index: None,
+        },
+        StatRow {
+            label: "Gold",
+            value: game.player.stats.gold.to_string(),
+            detail: "Gold buys merchant gear. Death costs 20% of the gold you are carrying.".into(),
+            cursor_index: None,
+        },
     ];
-    for (index, row) in rows.iter().enumerate() {
-        let (row_x, local_index) = if index < 3 {
-            (x + 42.0, index)
-        } else {
-            (x + 308.0, index - 3)
-        };
-        let row_y = y + 124.0 + local_index as f32 * 42.0;
-        if index == game.character_cursor {
-            draw_rectangle(
-                row_x - 10.0,
-                row_y - 24.0,
-                210.0,
-                30.0,
-                with_alpha(Color::from_rgba(255, 224, 96, 255), 0.1),
-            );
-        }
-        draw_text(
-            row,
-            row_x,
-            row_y,
-            22.0,
-            if index == game.character_cursor {
-                Color::from_rgba(255, 224, 96, 255)
-            } else {
-                WHITE
-            },
-        );
-    }
+
+    let combat_rows = vec![
+        StatRow {
+            label: "Power",
+            value: game.player.power().to_string(),
+            detail: format!(
+                "Power is your weapon baseline. It equals strength x2 plus {} gear power before attack rolls.",
+                game.player.equipment.bonus_power()
+            ),
+            cursor_index: None,
+        },
+        StatRow {
+            label: "Armor",
+            value: game.player.armor().to_string(),
+            detail: format!(
+                "Armor subtracts from incoming monster damage, but hits still deal at least 1. Current value includes {} gear armor.",
+                game.player.equipment.bonus_armor()
+            ),
+            cursor_index: None,
+        },
+        StatRow {
+            label: "Haste",
+            value: game.player.haste().to_string(),
+            detail: format!(
+                "Haste increases movement speed and shortens basic attack recovery. Current value includes {} gear haste.",
+                game.player.equipment.bonus_haste()
+            ),
+            cursor_index: None,
+        },
+        StatRow {
+            label: "Crit chance",
+            value: format!("{:.0}%", game.player.crit_chance() * 100.0),
+            detail: "Critical chance starts at 8%, gains 1% per agility, and caps at 35%. Critical hits deal double damage."
+                .into(),
+            cursor_index: None,
+        },
+        StatRow {
+            label: "Attack delay",
+            value: format!("{:.2}s", game.player.attack_interval()),
+            detail:
+                "Basic attacks recover faster with haste. The interval cannot go below 0.16 seconds."
+                    .into(),
+            cursor_index: None,
+        },
+        StatRow {
+            label: "Move speed",
+            value: format!("{:.0}", game.player.move_speed()),
+            detail:
+                "Movement speed starts at 150 and gains 4 for every point of haste.".into(),
+            cursor_index: None,
+        },
+    ];
+
+    let progression_rows = vec![StatRow {
+        label: "Stat points",
+        value: game.player.stats.unspent_stat_points.to_string(),
+        detail: "Spend stat points on Strength, Agility, or Vitality with Enter.".into(),
+        cursor_index: None,
+    }];
+
+    let hover = game.ui_hover_position();
+    let mut focused = draw_rows(&attribute_rows, left, game.character_cursor, hover);
+    focused = focused
+        .or_else(|| draw_rows(&combat_rows, middle, game.character_cursor, hover))
+        .or_else(|| {
+            draw_rows(
+                &progression_rows,
+                Rect::new(right.x + 18.0, right.y + 194.0, right.w - 36.0, 52.0),
+                game.character_cursor,
+                hover,
+            )
+        });
+
+    draw_progression_header(game, right);
+    draw_detail_panel(
+        right,
+        focused.unwrap_or_else(|| selected_detail(&attribute_rows, &progression_rows, game)),
+    );
+
     let mut hint_x = x + 24.0;
-    hint_x += draw_hotkey_hint("Up/Down", "select", vec2(hint_x, y + h - 44.0)) + 12.0;
+    hint_x += draw_hotkey_hint("Up/Down", "select spendable", vec2(hint_x, y + h - 44.0)) + 12.0;
     hint_x += draw_hotkey_hint("Enter", "spend", vec2(hint_x, y + h - 44.0)) + 12.0;
     hint_x += draw_hotkey_hint("C", "close", vec2(hint_x, y + h - 44.0)) + 12.0;
     draw_hotkey_hint("Esc", "close", vec2(hint_x, y + h - 44.0));
+}
+
+fn draw_overview(game: &Game, pos: Vec2) {
+    draw_text(
+        &format!(
+            "Level {}   XP {} / {}   Gold {}",
+            game.player.stats.level,
+            game.player.stats.xp,
+            game.player.stats.next_xp,
+            game.player.stats.gold
+        ),
+        pos.x,
+        pos.y,
+        20.0,
+        WHITE,
+    );
+    draw_text(
+        &format!("Stat points {}", game.player.stats.unspent_stat_points),
+        pos.x + 378.0,
+        pos.y,
+        18.0,
+        MUTED,
+    );
+}
+
+fn draw_rows<'a>(
+    rows: &'a [StatRow],
+    rect: Rect,
+    selected_cursor: usize,
+    mouse: Vec2,
+) -> Option<&'a str> {
+    let mut hovered = None;
+
+    for (index, row) in rows.iter().enumerate() {
+        let row_rect = Rect::new(
+            rect.x + 14.0,
+            rect.y + 16.0 + index as f32 * 34.0,
+            rect.w - 28.0,
+            28.0,
+        );
+        let is_hovered = row_rect.contains(mouse);
+        let is_selected = row.cursor_index == Some(selected_cursor);
+        if is_hovered {
+            hovered = Some(row.detail.as_str());
+        }
+        if is_hovered || is_selected {
+            draw_rectangle(
+                row_rect.x,
+                row_rect.y,
+                row_rect.w,
+                row_rect.h,
+                with_alpha(GOLD, if is_hovered { 0.16 } else { 0.1 }),
+            );
+        }
+        draw_text(
+            row.label,
+            row_rect.x + 8.0,
+            row_rect.y + 20.0,
+            18.0,
+            if is_selected { GOLD } else { WHITE },
+        );
+        let dims = measure_text(&row.value, None, 18, 1.0);
+        draw_text(
+            &row.value,
+            row_rect.x + row_rect.w - dims.width - 8.0,
+            row_rect.y + 20.0,
+            18.0,
+            if is_hovered { GOLD } else { WHITE },
+        );
+    }
+
+    hovered
+}
+
+fn selected_detail<'a>(
+    attribute_rows: &'a [StatRow],
+    progression_rows: &'a [StatRow],
+    game: &Game,
+) -> &'a str {
+    attribute_rows
+        .iter()
+        .chain(progression_rows.iter())
+        .find(|row| row.cursor_index == Some(game.character_cursor))
+        .map(|row| row.detail.as_str())
+        .unwrap_or("Hover a stat to inspect what it does.")
+}
+
+fn draw_progression_header(game: &Game, rect: Rect) {
+    let top = rect.y + 18.0;
+    draw_text("Progression", rect.x + 18.0, top + 2.0, 18.0, GOLD);
+    draw_rectangle(
+        rect.x + 18.0,
+        top + 18.0,
+        rect.w - 36.0,
+        18.0,
+        with_alpha(WHITE, 0.07),
+    );
+    draw_rectangle(
+        rect.x + 18.0,
+        top + 18.0,
+        (rect.w - 36.0) * (game.player.stats.xp as f32 / game.player.stats.next_xp as f32),
+        18.0,
+        with_alpha(GOLD, 0.72),
+    );
+    draw_text(
+        &format!(
+            "{} / {} xp",
+            game.player.stats.xp, game.player.stats.next_xp
+        ),
+        rect.x + 28.0,
+        top + 32.0,
+        15.0,
+        WHITE,
+    );
+    draw_text("Spend", rect.x + 18.0, top + 70.0, 18.0, GOLD);
+}
+
+fn draw_detail_panel(rect: Rect, detail: &str) {
+    let detail_rect = Rect::new(rect.x + 18.0, rect.y + 100.0, rect.w - 36.0, 84.0);
+    draw_rectangle(
+        detail_rect.x,
+        detail_rect.y,
+        detail_rect.w,
+        detail_rect.h,
+        PANEL,
+    );
+    for (index, line) in wrap_text(detail, detail_rect.w - 24.0, 17.0, 3)
+        .iter()
+        .enumerate()
+    {
+        draw_text(
+            line,
+            detail_rect.x + 12.0,
+            detail_rect.y + 24.0 + index as f32 * 19.0,
+            17.0,
+            WHITE,
+        );
+    }
 }

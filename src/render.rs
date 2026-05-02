@@ -58,6 +58,7 @@ impl Renderer {
         match game.ui_mode {
             UiMode::Inventory => ui::draw_inventory(game),
             UiMode::Character => ui::draw_character(game),
+            UiMode::SkillBook => ui::draw_skill_book(game),
             UiMode::WorldMap => ui::draw_world_map(game),
             UiMode::Merchant => ui::draw_shop(game),
             UiMode::Trainer => ui::draw_trainer(game),
@@ -189,6 +190,16 @@ impl Renderer {
     }
 
     fn draw_effects(&self, game: &Game, camera: Vec2) {
+        for projectile in &game.projectiles {
+            let screen = world_to_screen(projectile.pos, camera);
+            draw_circle(
+                screen.x,
+                screen.y,
+                projectile.radius + 5.0,
+                with_alpha(projectile.color, 0.18),
+            );
+            draw_circle(screen.x, screen.y, projectile.radius, projectile.color);
+        }
         for pulse in &game.pulses {
             let screen = world_to_screen(pulse.pos, camera);
             draw_circle_lines(
@@ -198,6 +209,26 @@ impl Renderer {
                 3.0,
                 with_alpha(pulse.color, (pulse.ttl * 1.5).clamp(0.0, 1.0)),
             );
+        }
+        for slash in &game.slash_arcs {
+            let center = world_to_screen(slash.pos, camera);
+            let base = slash.direction.y.atan2(slash.direction.x);
+            let start = base - std::f32::consts::FRAC_PI_2;
+            let segments = 10;
+            for index in 0..segments {
+                let a = start + std::f32::consts::PI * index as f32 / segments as f32;
+                let b = start + std::f32::consts::PI * (index + 1) as f32 / segments as f32;
+                let from = center + vec2(a.cos(), a.sin()) * slash.radius;
+                let to = center + vec2(b.cos(), b.sin()) * slash.radius;
+                draw_line(
+                    from.x,
+                    from.y,
+                    to.x,
+                    to.y,
+                    4.0,
+                    with_alpha(slash.color, (slash.ttl * 3.0).clamp(0.0, 1.0)),
+                );
+            }
         }
         for particle in &game.particles {
             let screen = world_to_screen(particle.pos, camera);

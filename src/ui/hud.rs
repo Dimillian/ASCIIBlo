@@ -2,7 +2,9 @@ use macroquad::prelude::*;
 
 use crate::{game::Game, render::with_alpha, world::World};
 
-use super::widgets::{draw_hotkey_badge, draw_hotkey_hint, wrap_text};
+use super::widgets::{
+    draw_alert_icon, draw_hotkey_badge, draw_hotkey_hint, hotkey_badge_width, wrap_text,
+};
 
 pub(crate) fn draw(game: &Game) {
     draw_rectangle(0.0, 0.0, screen_width(), 82.0, with_alpha(BLACK, 0.58));
@@ -99,10 +101,23 @@ pub(crate) fn draw(game: &Game) {
     let mut bottom_x = 22.0;
     bottom_x += draw_hotkey_hint("1", "rush", vec2(bottom_x, bar_y + 17.0)) + 14.0;
     bottom_x += draw_hotkey_hint("2", "nova", vec2(bottom_x, bar_y + 17.0)) + 14.0;
+    bottom_x += draw_hotkey_hint("3", "fireball", vec2(bottom_x, bar_y + 17.0)) + 14.0;
+    bottom_x += draw_hotkey_hint("4", "cleave", vec2(bottom_x, bar_y + 17.0)) + 14.0;
     bottom_x += draw_hotkey_hint("E", "loot", vec2(bottom_x, bar_y + 17.0)) + 14.0;
     bottom_x += draw_hotkey_hint("F", "talk", vec2(bottom_x, bar_y + 17.0)) + 14.0;
     bottom_x += draw_hotkey_hint("Tab", "inventory", vec2(bottom_x, bar_y + 17.0)) + 14.0;
-    bottom_x += draw_hotkey_hint("C", "character", vec2(bottom_x, bar_y + 17.0)) + 14.0;
+    bottom_x += draw_alerting_hotkey_hint(
+        "C",
+        "character",
+        vec2(bottom_x, bar_y + 17.0),
+        game.player.stats.unspent_stat_points > 0,
+    ) + 14.0;
+    bottom_x += draw_alerting_hotkey_hint(
+        "B",
+        "skills",
+        vec2(bottom_x, bar_y + 17.0),
+        game.player.stats.unspent_skill_points > 0,
+    ) + 14.0;
     draw_hotkey_hint("M", "map", vec2(bottom_x, bar_y + 17.0));
     draw_text(
         &format!(
@@ -120,6 +135,14 @@ pub(crate) fn draw(game: &Game) {
     draw_minimap(game);
     draw_hovered_monster_tooltip(game);
     draw_nearest_loot_tooltip(game);
+}
+
+fn draw_alerting_hotkey_hint(label: &str, text: &str, pos: Vec2, alert: bool) -> f32 {
+    let width = draw_hotkey_hint(label, text, pos);
+    if alert {
+        draw_alert_icon(vec2(pos.x + hotkey_badge_width(label) - 2.0, pos.y - 2.0));
+    }
+    width
 }
 
 fn draw_log(game: &Game) {

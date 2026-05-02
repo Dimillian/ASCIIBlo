@@ -29,9 +29,12 @@ struct InputState {
     attack_pressed: bool,
     rush_pressed: bool,
     nova_pressed: bool,
+    fireball_pressed: bool,
+    cleave_pressed: bool,
     pickup_pressed: bool,
     inventory_toggle_pressed: bool,
     character_toggle_pressed: bool,
+    skill_book_toggle_pressed: bool,
     world_map_toggle_pressed: bool,
     inventory_up_pressed: bool,
     inventory_down_pressed: bool,
@@ -98,11 +101,15 @@ pub struct Player {
     pub attack_cd: f32,
     pub rush_cd: f32,
     pub nova_cd: f32,
+    pub fireball_cd: f32,
+    pub cleave_cd: f32,
     pub stats: Stats,
     pub inventory: Vec<Item>,
     pub equipment: Equipment,
     pub rush_rank: i32,
     pub nova_rank: i32,
+    pub fireball_rank: i32,
+    pub cleave_rank: i32,
 }
 
 impl Player {
@@ -124,6 +131,18 @@ impl Player {
 
     pub fn haste(&self) -> i32 {
         self.stats.agility + self.equipment.bonus_haste()
+    }
+
+    pub fn crit_chance(&self) -> f32 {
+        (0.08 + self.stats.agility as f32 * 0.01).min(0.35)
+    }
+
+    pub fn move_speed(&self) -> f32 {
+        150.0 + self.haste() as f32 * 4.0
+    }
+
+    pub fn attack_interval(&self) -> f32 {
+        (0.5 - self.haste() as f32 * 0.018).max(0.16)
     }
 }
 
@@ -160,6 +179,7 @@ pub enum UiMode {
     None,
     Inventory,
     Character,
+    SkillBook,
     WorldMap,
     Merchant,
     Trainer,
@@ -195,6 +215,24 @@ pub struct Pulse {
     pub color: Color,
 }
 
+pub struct SlashArc {
+    pub pos: Vec2,
+    pub direction: Vec2,
+    pub radius: f32,
+    pub ttl: f32,
+    pub color: Color,
+}
+
+pub struct Projectile {
+    pub pos: Vec2,
+    pub vel: Vec2,
+    pub ttl: f32,
+    pub radius: f32,
+    pub damage: f32,
+    pub aoe_radius: f32,
+    pub color: Color,
+}
+
 pub struct WorldMapState {
     pub center_tile: Vec2,
     pub zoom: f32,
@@ -209,12 +247,15 @@ pub struct Game {
     pub floating: Vec<FloatingText>,
     pub particles: Vec<Particle>,
     pub pulses: Vec<Pulse>,
+    pub slash_arcs: Vec<SlashArc>,
+    pub projectiles: Vec<Projectile>,
     pub log: Vec<String>,
     pub log_scroll_offset: usize,
     pub known_tiles: HashSet<IVec2>,
     pub ui_mode: UiMode,
     pub inventory_cursor: usize,
     pub character_cursor: usize,
+    pub skill_book_cursor: usize,
     pub shop_cursor: usize,
     pub shop_tab: ShopTab,
     pub travel_cursor: usize,
@@ -223,6 +264,7 @@ pub struct Game {
     pub screen_shake: f32,
     pub elapsed: f32,
     pub preview_hover_world: Option<Vec2>,
+    pub preview_hover_screen: Option<Vec2>,
     rng: StdRng,
     input: InputState,
     quit: bool,
@@ -243,6 +285,8 @@ impl Game {
                 attack_cd: 0.0,
                 rush_cd: 0.0,
                 nova_cd: 0.0,
+                fireball_cd: 0.0,
+                cleave_cd: 0.0,
                 stats: Stats {
                     level: 1,
                     xp: 0,
@@ -262,6 +306,8 @@ impl Game {
                 },
                 rush_rank: 1,
                 nova_rank: 1,
+                fireball_rank: 1,
+                cleave_rank: 1,
             },
             monsters: Vec::new(),
             npcs: vec![
@@ -282,12 +328,15 @@ impl Game {
             floating: Vec::new(),
             particles: Vec::new(),
             pulses: Vec::new(),
+            slash_arcs: Vec::new(),
+            projectiles: Vec::new(),
             log: vec!["The bell in Ember Town rings. Go make trouble.".into()],
             log_scroll_offset: 0,
             known_tiles: HashSet::new(),
             ui_mode: UiMode::None,
             inventory_cursor: 0,
             character_cursor: 0,
+            skill_book_cursor: 0,
             shop_cursor: 0,
             shop_tab: ShopTab::Buy,
             travel_cursor: 0,
@@ -299,6 +348,7 @@ impl Game {
             screen_shake: 0.0,
             elapsed: 0.0,
             preview_hover_world: None,
+            preview_hover_screen: None,
             rng: StdRng::seed_from_u64(seed),
             input: InputState::default(),
             quit: false,
@@ -328,9 +378,12 @@ impl Game {
             is_mouse_button_pressed(MouseButton::Left) || is_key_pressed(KeyCode::Space);
         self.input.rush_pressed |= is_key_pressed(KeyCode::Key1);
         self.input.nova_pressed |= is_key_pressed(KeyCode::Key2);
+        self.input.fireball_pressed |= is_key_pressed(KeyCode::Key3);
+        self.input.cleave_pressed |= is_key_pressed(KeyCode::Key4);
         self.input.pickup_pressed |= is_key_pressed(KeyCode::E);
         self.input.inventory_toggle_pressed |= is_key_pressed(KeyCode::Tab);
         self.input.character_toggle_pressed |= is_key_pressed(KeyCode::C);
+        self.input.skill_book_toggle_pressed |= is_key_pressed(KeyCode::B);
         self.input.world_map_toggle_pressed |= is_key_pressed(KeyCode::M);
         self.input.inventory_up_pressed |= is_key_pressed(KeyCode::Up);
         self.input.inventory_down_pressed |= is_key_pressed(KeyCode::Down);
@@ -389,6 +442,13 @@ impl Game {
                 UiMode::Character
             };
         }
+        if self.input.skill_book_toggle_pressed {
+            self.ui_mode = if self.ui_mode == UiMode::SkillBook {
+                UiMode::None
+            } else {
+                UiMode::SkillBook
+            };
+        }
         if self.input.world_map_toggle_pressed {
             self.ui_mode = if self.ui_mode == UiMode::WorldMap {
                 UiMode::None
@@ -408,6 +468,11 @@ impl Game {
             }
             UiMode::Character => {
                 self.update_character_controls();
+                self.clear_edge_inputs();
+                return;
+            }
+            UiMode::SkillBook => {
+                self.update_skill_book_controls();
                 self.clear_edge_inputs();
                 return;
             }
@@ -445,6 +510,8 @@ impl Game {
         self.player.attack_cd = (self.player.attack_cd - dt).max(0.0);
         self.player.rush_cd = (self.player.rush_cd - dt).max(0.0);
         self.player.nova_cd = (self.player.nova_cd - dt).max(0.0);
+        self.player.fireball_cd = (self.player.fireball_cd - dt).max(0.0);
+        self.player.cleave_cd = (self.player.cleave_cd - dt).max(0.0);
         self.player.mana = (self.player.mana + dt * 4.0).min(self.player.max_mana());
 
         self.update_player_movement(dt);
@@ -458,10 +525,17 @@ impl Game {
         if self.input.nova_pressed {
             self.cast_nova();
         }
+        if self.input.fireball_pressed {
+            self.cast_fireball();
+        }
+        if self.input.cleave_pressed {
+            self.cast_cleave();
+        }
         if self.input.pickup_pressed {
             self.pickup_loot();
         }
 
+        self.update_projectiles(dt);
         self.update_monsters(dt);
         self.cull_distant_monsters();
         self.replenish_local_monsters();
@@ -487,6 +561,12 @@ impl Game {
             pulse.radius += dt * 140.0;
         }
         self.pulses.retain(|pulse| pulse.ttl > 0.0);
+
+        for slash in &mut self.slash_arcs {
+            slash.ttl -= dt;
+            slash.radius += dt * 36.0;
+        }
+        self.slash_arcs.retain(|slash| slash.ttl > 0.0);
 
         for loot in &mut self.loot {
             loot.bob += dt * 4.0;
@@ -514,13 +594,20 @@ impl Game {
         self.quit
     }
 
+    pub fn ui_hover_position(&self) -> Vec2 {
+        self.preview_hover_screen.unwrap_or(mouse_position().into())
+    }
+
     fn clear_edge_inputs(&mut self) {
         self.input.attack_pressed = false;
         self.input.rush_pressed = false;
         self.input.nova_pressed = false;
+        self.input.fireball_pressed = false;
+        self.input.cleave_pressed = false;
         self.input.pickup_pressed = false;
         self.input.inventory_toggle_pressed = false;
         self.input.character_toggle_pressed = false;
+        self.input.skill_book_toggle_pressed = false;
         self.input.world_map_toggle_pressed = false;
         self.input.inventory_up_pressed = false;
         self.input.inventory_down_pressed = false;
@@ -556,7 +643,7 @@ impl Game {
             self.character_cursor = self.character_cursor.saturating_sub(1);
         }
         if self.input.inventory_down_pressed {
-            self.character_cursor = (self.character_cursor + 1).min(4);
+            self.character_cursor = (self.character_cursor + 1).min(2);
         }
         if self.input.inventory_equip_pressed {
             match self.character_cursor {
@@ -576,18 +663,42 @@ impl Game {
                     self.player.hp = self.player.max_hp();
                     self.log("Vitality deepens.".into());
                 }
-                3 if self.player.stats.unspent_skill_points > 0 => {
+                _ => {}
+            }
+        }
+    }
+
+    fn update_skill_book_controls(&mut self) {
+        if self.input.inventory_up_pressed {
+            self.skill_book_cursor = self.skill_book_cursor.saturating_sub(1);
+        }
+        if self.input.inventory_down_pressed {
+            self.skill_book_cursor = (self.skill_book_cursor + 1).min(3);
+        }
+        if self.input.inventory_equip_pressed && self.player.stats.unspent_skill_points > 0 {
+            match self.skill_book_cursor {
+                0 => {
                     self.player.rush_rank += 1;
-                    self.player.stats.unspent_skill_points -= 1;
                     self.log(format!("Rush reaches rank {}.", self.player.rush_rank));
                 }
-                4 if self.player.stats.unspent_skill_points > 0 => {
+                1 => {
                     self.player.nova_rank += 1;
-                    self.player.stats.unspent_skill_points -= 1;
                     self.log(format!("Nova reaches rank {}.", self.player.nova_rank));
+                }
+                2 => {
+                    self.player.fireball_rank += 1;
+                    self.log(format!(
+                        "Fireball reaches rank {}.",
+                        self.player.fireball_rank
+                    ));
+                }
+                3 => {
+                    self.player.cleave_rank += 1;
+                    self.log(format!("Cleave reaches rank {}.", self.player.cleave_rank));
                 }
                 _ => {}
             }
+            self.player.stats.unspent_skill_points -= 1;
         }
     }
 
@@ -631,7 +742,7 @@ impl Game {
 
     fn update_trainer_controls(&mut self) {
         if self.input.inventory_equip_pressed {
-            self.ui_mode = UiMode::Character;
+            self.ui_mode = UiMode::SkillBook;
         }
     }
 
@@ -703,7 +814,7 @@ impl Game {
     }
 
     fn update_player_movement(&mut self, dt: f32) {
-        let speed = 150.0 + self.player.haste() as f32 * 4.0;
+        let speed = self.player.move_speed();
         let desired = self.input.movement * speed;
         self.player.vel = self.player.vel.lerp(desired, 1.0 - 0.0002_f32.powf(dt));
         if self.input.aim_world.distance_squared(self.player.pos) > 4.0 {
@@ -749,7 +860,7 @@ impl Game {
         } else {
             self.log("You carve only air.".into());
         }
-        self.player.attack_cd = (0.5 - self.player.haste() as f32 * 0.018).max(0.16);
+        self.player.attack_cd = self.player.attack_interval();
     }
 
     fn cast_rush(&mut self) {
@@ -824,6 +935,123 @@ impl Game {
         }
     }
 
+    fn cast_fireball(&mut self) {
+        if self.player.fireball_cd > 0.0 || self.player.mana < 12.0 {
+            return;
+        }
+        self.player.mana -= 12.0;
+        self.player.fireball_cd = 1.2;
+        let direction = self.player.facing.normalize_or_zero();
+        let damage = self.roll_player_damage(true) + 8.0 + self.player.fireball_rank as f32 * 2.0;
+        self.projectiles.push(Projectile {
+            pos: self.player.pos + direction * 20.0,
+            vel: direction * 320.0,
+            ttl: 0.95,
+            radius: 7.0,
+            damage,
+            aoe_radius: 34.0 + self.player.fireball_rank as f32 * 3.0,
+            color: Color::from_rgba(255, 132, 64, 255),
+        });
+        self.spawn_particles(
+            self.player.pos + direction * 18.0,
+            6,
+            Color::from_rgba(255, 132, 64, 255),
+        );
+    }
+
+    fn cast_cleave(&mut self) {
+        if self.player.cleave_cd > 0.0 || self.player.mana < 10.0 {
+            return;
+        }
+        self.player.mana -= 10.0;
+        self.player.cleave_cd = 2.2;
+        self.pulses.push(Pulse {
+            pos: self.player.pos,
+            radius: 18.0,
+            ttl: 0.3,
+            color: Color::from_rgba(255, 176, 88, 255),
+        });
+        self.slash_arcs.push(SlashArc {
+            pos: self.player.pos,
+            direction: self.player.facing.normalize_or_zero(),
+            radius: 48.0,
+            ttl: 0.28,
+            color: Color::from_rgba(255, 176, 88, 255),
+        });
+        self.spawn_particles(self.player.pos, 14, Color::from_rgba(255, 176, 88, 255));
+
+        let direction = self.player.facing.normalize_or_zero();
+        let hits: Vec<usize> = self
+            .monsters
+            .iter()
+            .enumerate()
+            .filter_map(|(index, monster)| {
+                let to_monster = monster.pos - self.player.pos;
+                let distance = to_monster.length();
+                let aligned = to_monster.normalize_or_zero().dot(direction);
+                (distance <= 68.0 && aligned >= 0.0).then_some(index)
+            })
+            .collect();
+        if hits.is_empty() {
+            self.log("Cleave whistles through empty air.".into());
+        }
+        for index in hits.into_iter().rev() {
+            let damage = self.roll_player_damage(true) + 5.0 + self.player.cleave_rank as f32 * 2.0;
+            self.hit_monster(index, damage, true);
+        }
+    }
+
+    fn update_projectiles(&mut self, dt: f32) {
+        let mut active = Vec::with_capacity(self.projectiles.len());
+        let mut impacts = Vec::new();
+        for mut projectile in self.projectiles.drain(..) {
+            projectile.ttl -= dt;
+            projectile.pos += projectile.vel * dt;
+            let hits_monster = self
+                .monsters
+                .iter()
+                .any(|monster| monster.pos.distance(projectile.pos) <= projectile.radius + 12.0);
+            if projectile.ttl <= 0.0
+                || hits_monster
+                || self
+                    .world
+                    .collides_circle(projectile.pos, projectile.radius)
+            {
+                impacts.push(projectile);
+            } else {
+                active.push(projectile);
+            }
+        }
+        self.projectiles = active;
+        for projectile in impacts {
+            self.detonate_fireball(projectile);
+        }
+    }
+
+    fn detonate_fireball(&mut self, projectile: Projectile) {
+        self.pulses.push(Pulse {
+            pos: projectile.pos,
+            radius: 14.0,
+            ttl: 0.36,
+            color: projectile.color,
+        });
+        self.spawn_particles(projectile.pos, 20, projectile.color);
+        let hits: Vec<usize> = self
+            .monsters
+            .iter()
+            .enumerate()
+            .filter_map(|(index, monster)| {
+                (monster.pos.distance(projectile.pos) <= projectile.aoe_radius).then_some(index)
+            })
+            .collect();
+        if hits.is_empty() {
+            self.log("Fireball blooms against the ground.".into());
+        }
+        for index in hits.into_iter().rev() {
+            self.hit_monster(index, projectile.damage, true);
+        }
+    }
+
     fn update_monsters(&mut self, dt: f32) {
         let player_pos = self.player.pos;
         let mut attacks = Vec::new();
@@ -891,9 +1119,7 @@ impl Game {
     }
 
     fn roll_player_damage(&mut self, skill: bool) -> f32 {
-        let crit = self
-            .rng
-            .random_bool((0.08 + self.player.stats.agility as f64 * 0.01).min(0.35));
+        let crit = self.rng.random_bool(self.player.crit_chance() as f64);
         let base = self.player.power() as f32 + self.rng.random_range(3.0..=8.0);
         let skill_bonus = if skill { 4.0 } else { 0.0 };
         if crit {
@@ -1449,6 +1675,99 @@ mod tests {
     }
 
     #[test]
+    fn fireball_explodes_and_hits_nearby_monsters() {
+        let mut game = Game::new(7);
+        game.monsters = vec![
+            Monster {
+                kind: MonsterKind::Imp,
+                pos: game.player.pos + vec2(34.0, 0.0),
+                vel: Vec2::ZERO,
+                hp: 80.0,
+                max_hp: 80.0,
+                level: 1,
+                attack_cd: 0.0,
+                wobble: 0.0,
+            },
+            Monster {
+                kind: MonsterKind::Slime,
+                pos: game.player.pos + vec2(48.0, 10.0),
+                vel: Vec2::ZERO,
+                hp: 80.0,
+                max_hp: 80.0,
+                level: 1,
+                attack_cd: 0.0,
+                wobble: 0.0,
+            },
+            Monster {
+                kind: MonsterKind::Brute,
+                pos: game.player.pos + vec2(120.0, 0.0),
+                vel: Vec2::ZERO,
+                hp: 80.0,
+                max_hp: 80.0,
+                level: 1,
+                attack_cd: 0.0,
+                wobble: 0.0,
+            },
+        ];
+        game.player.facing = Vec2::X;
+
+        game.cast_fireball();
+        game.update_projectiles(FIXED_DT);
+
+        assert!(game.projectiles.is_empty());
+        assert!(game.monsters[0].hp < 80.0);
+        assert!(game.monsters[1].hp < 80.0);
+        assert_eq!(game.monsters[2].hp, 80.0);
+    }
+
+    #[test]
+    fn cleave_hits_front_arc_without_hitting_behind() {
+        let mut game = Game::new(8);
+        game.monsters = vec![
+            Monster {
+                kind: MonsterKind::Imp,
+                pos: game.player.pos + vec2(36.0, 0.0),
+                vel: Vec2::ZERO,
+                hp: 80.0,
+                max_hp: 80.0,
+                level: 1,
+                attack_cd: 0.0,
+                wobble: 0.0,
+            },
+            Monster {
+                kind: MonsterKind::Slime,
+                pos: game.player.pos + vec2(-36.0, 0.0),
+                vel: Vec2::ZERO,
+                hp: 80.0,
+                max_hp: 80.0,
+                level: 1,
+                attack_cd: 0.0,
+                wobble: 0.0,
+            },
+        ];
+        game.player.facing = Vec2::X;
+
+        game.cast_cleave();
+
+        assert!(game.monsters[0].hp < 80.0);
+        assert_eq!(game.monsters[1].hp, 80.0);
+    }
+
+    #[test]
+    fn skill_book_spends_points_on_selected_skill() {
+        let mut game = Game::new(9);
+        game.player.stats.unspent_skill_points = 1;
+        game.skill_book_cursor = 2;
+        let starting_rank = game.player.fireball_rank;
+        game.input.inventory_equip_pressed = true;
+
+        game.update_skill_book_controls();
+
+        assert_eq!(game.player.fireball_rank, starting_rank + 1);
+        assert_eq!(game.player.stats.unspent_skill_points, 0);
+    }
+
+    #[test]
     fn every_ui_window_supports_basic_navigation() {
         let mut game = Game::new(3);
 
@@ -1467,6 +1786,15 @@ mod tests {
         game.input.inventory_down_pressed = true;
         game.fixed_update(FIXED_DT);
         assert_eq!(game.character_cursor, 1);
+
+        game.ui_mode = UiMode::None;
+        game.input = InputState::default();
+        game.input.skill_book_toggle_pressed = true;
+        game.fixed_update(FIXED_DT);
+        assert_eq!(game.ui_mode, UiMode::SkillBook);
+        game.input.inventory_down_pressed = true;
+        game.fixed_update(FIXED_DT);
+        assert_eq!(game.skill_book_cursor, 1);
 
         game.ui_mode = UiMode::None;
         game.input = InputState::default();
@@ -1500,7 +1828,7 @@ mod tests {
         game.input = InputState::default();
         game.input.inventory_equip_pressed = true;
         game.fixed_update(FIXED_DT);
-        assert_eq!(game.ui_mode, UiMode::Character);
+        assert_eq!(game.ui_mode, UiMode::SkillBook);
 
         game.ui_mode = UiMode::None;
         game.player.pos = game

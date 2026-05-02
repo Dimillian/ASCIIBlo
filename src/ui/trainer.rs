@@ -20,6 +20,6 @@ pub(crate) fn draw(_game: &Game) {
         WHITE,
     );
     let mut hint_x = x + 24.0;
-    hint_x += draw_hotkey_hint("Enter", "open hero", vec2(hint_x, y + h - 46.0)) + 12.0;
+    hint_x += draw_hotkey_hint("Enter", "open skills", vec2(hint_x, y + h - 46.0)) + 12.0;
     draw_hotkey_hint("Esc", "close", vec2(hint_x, y + h - 46.0));
 }

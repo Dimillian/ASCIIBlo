@@ -13,6 +13,7 @@ pub enum PreviewMode {
     Pickup,
     Inventory,
     Character,
+    SkillBook,
     WorldMap,
     ShopBuy,
     ShopSell,
@@ -21,11 +22,12 @@ pub enum PreviewMode {
 }
 
 impl PreviewMode {
-    pub const ALL: [PreviewMode; 9] = [
+    pub const ALL: [PreviewMode; 10] = [
         PreviewMode::Gameplay,
         PreviewMode::Pickup,
         PreviewMode::Inventory,
         PreviewMode::Character,
+        PreviewMode::SkillBook,
         PreviewMode::WorldMap,
         PreviewMode::ShopBuy,
         PreviewMode::ShopSell,
@@ -39,6 +41,7 @@ impl PreviewMode {
             PreviewMode::Pickup => "pickup",
             PreviewMode::Inventory => "inventory",
             PreviewMode::Character => "character",
+            PreviewMode::SkillBook => "skill-book",
             PreviewMode::WorldMap => "world-map",
             PreviewMode::ShopBuy => "shop-buy",
             PreviewMode::ShopSell => "shop-sell",
@@ -53,6 +56,7 @@ impl PreviewMode {
             "pickup" => Some(PreviewMode::Pickup),
             "inventory" => Some(PreviewMode::Inventory),
             "character" => Some(PreviewMode::Character),
+            "skill-book" => Some(PreviewMode::SkillBook),
             "world-map" => Some(PreviewMode::WorldMap),
             "shop-buy" => Some(PreviewMode::ShopBuy),
             "shop-sell" => Some(PreviewMode::ShopSell),
@@ -68,9 +72,26 @@ impl PreviewMode {
         game.travel_cursor = 0;
         game.inventory_cursor = 0;
         game.character_cursor = 0;
+        game.skill_book_cursor = 0;
+        game.player.stats.unspent_stat_points = 0;
+        game.player.stats.unspent_skill_points = 0;
         game.ui_mode = UiMode::None;
         game.shop_tab = ShopTab::Buy;
         game.loot.clear();
+        game.floating.clear();
+        game.particles.clear();
+        game.pulses.clear();
+        game.slash_arcs.clear();
+        game.projectiles.clear();
+        game.player.hp = game.player.max_hp();
+        game.player.mana = game.player.max_mana();
+        game.player.attack_cd = 0.0;
+        game.player.rush_cd = 0.0;
+        game.player.nova_cd = 0.0;
+        game.player.fireball_cd = 0.0;
+        game.player.cleave_cd = 0.0;
+        game.log = vec!["The bell in Ember Town rings. Go make trouble.".into()];
+        game.preview_hover_screen = Some(Vec2::new(-1_000.0, -1_000.0));
 
         match self {
             PreviewMode::Gameplay => {
@@ -117,7 +138,15 @@ impl PreviewMode {
                 });
             }
             PreviewMode::Inventory => game.ui_mode = UiMode::Inventory,
-            PreviewMode::Character => game.ui_mode = UiMode::Character,
+            PreviewMode::Character => {
+                game.player.stats.unspent_stat_points = 3;
+                game.ui_mode = UiMode::Character;
+            }
+            PreviewMode::SkillBook => {
+                game.player.stats.unspent_skill_points = 1;
+                game.skill_book_cursor = 2;
+                game.ui_mode = UiMode::SkillBook;
+            }
             PreviewMode::WorldMap => {
                 game.ui_mode = UiMode::WorldMap;
                 for center in [
@@ -270,6 +299,10 @@ mod tests {
         PreviewMode::WorldMap.configure(&mut game);
         assert_eq!(game.ui_mode, UiMode::WorldMap);
         assert!(game.known_tiles.len() > 600);
+
+        PreviewMode::SkillBook.configure(&mut game);
+        assert_eq!(game.ui_mode, UiMode::SkillBook);
+        assert_eq!(game.skill_book_cursor, 2);
 
         PreviewMode::Travel.configure(&mut game);
         assert_eq!(game.ui_mode, UiMode::Travel);

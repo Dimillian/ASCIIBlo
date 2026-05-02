@@ -135,6 +135,12 @@ pub(crate) fn draw_hotkey_hint(label: &str, text: &str, pos: Vec2) -> f32 {
     badge_w + 8.0 + measure_text(text, None, 17, 1.0).width
 }
 
+pub(crate) fn draw_alert_icon(pos: Vec2) {
+    draw_circle(pos.x, pos.y, 8.0, Color::from_rgba(255, 96, 96, 255));
+    draw_circle(pos.x, pos.y, 5.5, Color::from_rgba(24, 26, 32, 255));
+    draw_text("!", pos.x - 2.5, pos.y + 4.5, 13.0, WHITE);
+}
+
 pub(crate) fn draw_item_detail(item: &Item, pos: Vec2) {
     draw_text(&item.name, pos.x, pos.y, 22.0, item.rarity.color());
     draw_label_inline(
