@@ -842,6 +842,13 @@ impl Game {
         }
         let range = 54.0;
         let direction = self.player.facing;
+        self.slash_arcs.push(SlashArc {
+            pos: self.player.pos,
+            direction,
+            radius: 34.0,
+            ttl: 0.16,
+            color: Color::from_rgba(236, 238, 244, 255),
+        });
         let target = self
             .monsters
             .iter()
@@ -1718,6 +1725,19 @@ mod tests {
         assert!(game.monsters[0].hp < 80.0);
         assert!(game.monsters[1].hp < 80.0);
         assert_eq!(game.monsters[2].hp, 80.0);
+    }
+
+    #[test]
+    fn basic_attack_spawns_a_short_slash_arc() {
+        let mut game = Game::new(10);
+        game.player.facing = Vec2::X;
+
+        game.basic_attack();
+
+        assert_eq!(game.slash_arcs.len(), 1);
+        assert_eq!(game.slash_arcs[0].direction, Vec2::X);
+        assert_eq!(game.slash_arcs[0].radius, 34.0);
+        assert_eq!(game.slash_arcs[0].ttl, 0.16);
     }
 
     #[test]
