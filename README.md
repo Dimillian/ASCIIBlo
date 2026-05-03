@@ -17,7 +17,7 @@ cargo run -- --preview inventory --output /tmp/asciiblo-inventory.png
 cargo run -- --preview-all /tmp/asciiblo-previews
 ```
 
-Available single-screen preview modes currently include `gameplay`, `pickup`, `inventory`, `character`, `skill-book`, `world-map`, `shop-buy`, `shop-sell`, `trainer`, and `travel`.
+Available single-screen preview modes currently include `gameplay`, `lighting`, `pickup`, `inventory`, `character`, `skill-book`, `world-map`, `shop-buy`, `shop-sell`, `trainer`, and `travel`.
 
 Controls:
 

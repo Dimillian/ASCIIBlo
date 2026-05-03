@@ -1,18 +1,19 @@
 use std::{env, path::PathBuf};
 
-use macroquad::prelude::{Vec2, ivec2};
+use macroquad::prelude::{Color, Vec2, ivec2};
 
 use crate::{
     content::{Item, Rarity, Slot},
     game::{
-        AbilityKind, DisciplineKind, Game, Loot, Monster, Notification, ShopTab, SkillBookFocus,
-        SkillXpToast, UiMode,
+        AbilityKind, DisciplineKind, Game, Loot, Monster, Notification, Projectile, Pulse, ShopTab,
+        SkillBookFocus, SkillXpToast, UiMode,
     },
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PreviewMode {
     Gameplay,
+    Lighting,
     Pickup,
     Inventory,
     Character,
@@ -25,8 +26,9 @@ pub enum PreviewMode {
 }
 
 impl PreviewMode {
-    pub const ALL: [PreviewMode; 10] = [
+    pub const ALL: [PreviewMode; 11] = [
         PreviewMode::Gameplay,
+        PreviewMode::Lighting,
         PreviewMode::Pickup,
         PreviewMode::Inventory,
         PreviewMode::Character,
@@ -41,6 +43,7 @@ impl PreviewMode {
     pub fn slug(self) -> &'static str {
         match self {
             PreviewMode::Gameplay => "gameplay",
+            PreviewMode::Lighting => "lighting",
             PreviewMode::Pickup => "pickup",
             PreviewMode::Inventory => "inventory",
             PreviewMode::Character => "character",
@@ -56,6 +59,7 @@ impl PreviewMode {
     fn from_slug(value: &str) -> Option<Self> {
         match value {
             "gameplay" => Some(PreviewMode::Gameplay),
+            "lighting" => Some(PreviewMode::Lighting),
             "pickup" => Some(PreviewMode::Pickup),
             "inventory" => Some(PreviewMode::Inventory),
             "character" => Some(PreviewMode::Character),
@@ -150,6 +154,43 @@ impl PreviewMode {
                     chill_ttl: 0.0,
                 });
                 game.preview_hover_world = Some(game.player.pos + Vec2::new(42.0, 0.0));
+            }
+            PreviewMode::Lighting => {
+                game.monsters.clear();
+                game.projectiles.push(Projectile {
+                    ability: AbilityKind::Fireball,
+                    pos: game.player.pos + Vec2::new(76.0, -18.0),
+                    vel: Vec2::new(160.0, 0.0),
+                    ttl: 0.95,
+                    radius: 7.0,
+                    damage: 18.0,
+                    aoe_radius: 34.0,
+                    color: Color::from_rgba(255, 132, 64, 255),
+                });
+                game.pulses.push(Pulse {
+                    pos: game.player.pos + Vec2::new(-72.0, 18.0),
+                    radius: 18.0,
+                    ttl: 0.42,
+                    color: Color::from_rgba(128, 214, 255, 255),
+                });
+                game.loot.push(Loot {
+                    pos: game.player.pos + Vec2::new(-118.0, -16.0),
+                    item: Item {
+                        name: "Frostglass Charm".into(),
+                        base_name: "Charm".into(),
+                        slot: Slot::Charm,
+                        rarity: Rarity::Magic,
+                        item_level: 4,
+                        affixes: vec!["Frostglass".into()],
+                        power: 0,
+                        armor: 0,
+                        vitality: 1,
+                        haste: 2,
+                        value: 31,
+                    },
+                    bob: 0.0,
+                });
+                game.log = vec!["Warm and cool light cross the town square.".into()];
             }
             PreviewMode::Pickup => {
                 game.loot.push(Loot {
@@ -361,6 +402,11 @@ mod tests {
         assert_eq!(game.skill_book_cursor, 1);
         assert_eq!(game.skill_book_focus, SkillBookFocus::Skills);
 
+        PreviewMode::Lighting.configure(&mut game);
+        assert_eq!(game.projectiles.len(), 1);
+        assert_eq!(game.pulses.len(), 1);
+        assert_eq!(game.loot.len(), 1);
+
         PreviewMode::Travel.configure(&mut game);
         assert_eq!(game.ui_mode, UiMode::Travel);
         assert_eq!(game.shop_tab, ShopTab::Buy);
@@ -377,7 +423,7 @@ mod tests {
         assert!(matches!(runner.tick(), PreviewTick::Continue));
         assert!(matches!(
             runner.tick(),
-            PreviewTick::CaptureAndAdvance(_, PreviewMode::Pickup)
+            PreviewTick::CaptureAndAdvance(_, PreviewMode::Lighting)
         ));
     }
 }

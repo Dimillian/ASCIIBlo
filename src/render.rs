@@ -96,7 +96,7 @@ impl Renderer {
                     screen.y - TILE * 0.5,
                     TILE + 1.0,
                     TILE + 1.0,
-                    light_color(cached.bg, light),
+                    apply_light(cached.bg, light),
                 );
                 self.draw_biome_edge(game, tile_pos, screen, biome);
                 if !should_draw_tile_glyph(cached, tile_pos, game.world.seed) {
@@ -108,7 +108,7 @@ impl Renderer {
                     cached.tile.glyph(shimmer),
                     screen,
                     18.0,
-                    with_alpha(light_color(cached.fg, light * 0.7), 0.72),
+                    with_alpha(apply_light(cached.fg, light.scale(0.7)), 0.72),
                 );
                 self.draw_tile_accent(cached, tile_pos, screen, game.world.seed, game.elapsed);
             }
@@ -272,12 +272,7 @@ impl Renderer {
     fn draw_loot(&self, game: &Game, camera: Vec2) {
         for loot in &game.loot {
             let screen = world_to_screen(loot.pos, camera) + vec2(0.0, loot.bob.sin() * 4.0);
-            draw_circle(
-                screen.x,
-                screen.y,
-                10.0,
-                with_alpha(loot.item.rarity.color(), 0.18),
-            );
+            draw_glow(screen, 8.0, loot.item.rarity.color(), 0.8);
             draw_text_centered("*", screen, 24.0, loot.item.rarity.color());
         }
     }
@@ -469,6 +464,12 @@ impl Renderer {
         for meteor in &game.meteors {
             let screen = world_to_screen(meteor.pos, camera);
             let ratio = (meteor.ttl / 0.72).clamp(0.0, 1.0);
+            draw_glow(
+                screen,
+                10.0 + (1.0 - ratio) * 8.0,
+                Color::from_rgba(255, 132, 64, 255),
+                0.92,
+            );
             draw_circle_lines(
                 screen.x,
                 screen.y,
@@ -495,16 +496,17 @@ impl Renderer {
                     with_alpha(projectile.color, 0.22 * scale),
                 );
             }
-            draw_circle(
-                screen.x,
-                screen.y,
-                projectile.radius + 5.0,
-                with_alpha(projectile.color, 0.18),
-            );
+            draw_glow(screen, projectile.radius + 4.0, projectile.color, 1.0);
             draw_circle(screen.x, screen.y, projectile.radius, projectile.color);
         }
         for pulse in &game.pulses {
             let screen = world_to_screen(pulse.pos, camera);
+            draw_glow(
+                screen,
+                pulse.radius * 0.6 + 5.0,
+                pulse.color,
+                (pulse.ttl * 2.4).clamp(0.0, 0.9),
+            );
             draw_circle_lines(
                 screen.x,
                 screen.y,
@@ -559,38 +561,116 @@ struct SceneLight {
     pos: Vec2,
     radius: f32,
     intensity: f32,
+    color: Color,
 }
+
+#[derive(Clone, Copy, Debug)]
+struct LightSample {
+    r: f32,
+    g: f32,
+    b: f32,
+}
+
+impl LightSample {
+    fn neutral(amount: f32) -> Self {
+        Self {
+            r: amount,
+            g: amount,
+            b: amount,
+        }
+    }
+
+    fn add(mut self, color: Color, amount: f32) -> Self {
+        self.r += color.r * amount;
+        self.g += color.g * amount;
+        self.b += color.b * amount;
+        self
+    }
+
+    fn clamped(self) -> Self {
+        Self {
+            r: self.r.min(MAX_LIGHT_CHANNEL),
+            g: self.g.min(MAX_LIGHT_CHANNEL),
+            b: self.b.min(MAX_LIGHT_CHANNEL),
+        }
+    }
+
+    fn scale(self, factor: f32) -> Self {
+        Self {
+            r: self.r * factor,
+            g: self.g * factor,
+            b: self.b * factor,
+        }
+    }
+}
+
+const MAX_LIGHT_CHANNEL: f32 = 0.34;
 
 fn collect_lights(game: &Game) -> Vec<SceneLight> {
     let mut lights = vec![SceneLight {
         pos: game.player.pos,
         radius: TILE * 8.0,
         intensity: 0.16,
+        color: Color::from_rgba(255, 238, 214, 255),
     }];
     for projectile in &game.projectiles {
         lights.push(SceneLight {
             pos: projectile.pos,
             radius: TILE * 4.0,
-            intensity: 0.24,
+            intensity: 0.26,
+            color: projectile.color,
         });
     }
     for loot in &game.loot {
         lights.push(SceneLight {
             pos: loot.pos,
             radius: TILE * 2.5,
-            intensity: 0.08,
+            intensity: 0.10,
+            color: loot.item.rarity.color(),
+        });
+    }
+    for pulse in &game.pulses {
+        lights.push(SceneLight {
+            pos: pulse.pos,
+            radius: pulse.radius.max(TILE * 2.5),
+            intensity: 0.08 + pulse.ttl.min(0.4) * 0.20,
+            color: pulse.color,
+        });
+    }
+    for meteor in &game.meteors {
+        let ratio = (meteor.ttl / 0.72).clamp(0.0, 1.0);
+        lights.push(SceneLight {
+            pos: meteor.pos,
+            radius: TILE * 5.0,
+            intensity: 0.10 + (1.0 - ratio) * 0.14,
+            color: Color::from_rgba(255, 132, 64, 255),
         });
     }
     lights
 }
 
-fn light_at(pos: Vec2, biome: Biome, lights: &[SceneLight]) -> f32 {
+fn light_at(pos: Vec2, biome: Biome, lights: &[SceneLight]) -> LightSample {
     let ambient = if biome == Biome::Town { 0.08 } else { 0.0 };
-    let local = lights.iter().fold(0.0_f32, |value, light| {
-        let ratio = (1.0 - pos.distance(light.pos) / light.radius).clamp(0.0, 1.0);
-        value.max(ratio * ratio * light.intensity)
-    });
-    (ambient + local).min(0.28)
+    lights
+        .iter()
+        .fold(LightSample::neutral(ambient), |sample, light| {
+            sample.add(light.color, light_falloff(pos, *light))
+        })
+        .clamped()
+}
+
+fn light_falloff(pos: Vec2, light: SceneLight) -> f32 {
+    let ratio = (1.0 - pos.distance(light.pos) / light.radius).clamp(0.0, 1.0);
+    ratio * ratio * light.intensity
+}
+
+fn apply_light(color: Color, light: LightSample) -> Color {
+    Color::new(
+        color.r + (1.0 - color.r) * light.r,
+        color.g + (1.0 - color.g) * light.g,
+        color.b + (1.0 - color.b) * light.b,
+        color.a,
+    )
 }
 
 fn light_color(color: Color, amount: f32) -> Color {
@@ -655,7 +735,70 @@ fn draw_text_centered(text: &str, center: Vec2, size: f32, color: Color) {
     );
 }
 
+fn draw_glow(center: Vec2, radius: f32, color: Color, strength: f32) {
+    for (scale, alpha) in [(3.0, 0.05), (2.1, 0.08), (1.45, 0.14)] {
+        draw_circle(
+            center.x,
+            center.y,
+            radius * scale,
+            with_alpha(color, alpha * strength),
+        );
+    }
+}
+
 pub(crate) fn with_alpha(mut color: Color, alpha: f32) -> Color {
     color.a = alpha;
     color
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn light(color: Color) -> SceneLight {
+        SceneLight {
+            pos: Vec2::ZERO,
+            radius: 10.0,
+            intensity: 0.24,
+            color,
+        }
+    }
+
+    #[test]
+    fn light_falloff_is_stronger_at_the_source_than_the_edge() {
+        let light = light(WHITE);
+
+        assert!(light_falloff(Vec2::ZERO, light) > light_falloff(vec2(10.0, 0.0), light));
+        assert_eq!(light_falloff(vec2(10.0, 0.0), light), 0.0);
+    }
+
+    #[test]
+    fn fireball_light_warms_the_result_more_than_neutral_light() {
+        let base = Color::from_rgba(40, 40, 40, 255);
+        let fireball = Color::from_rgba(255, 132, 64, 255);
+        let warm = apply_light(
+            base,
+            light_at(Vec2::ZERO, Biome::Meadow, &[light(fireball)]),
+        );
+        let neutral = apply_light(base, light_at(Vec2::ZERO, Biome::Meadow, &[light(WHITE)]));
+
+        assert!(warm.r - warm.b > neutral.r - neutral.b);
+    }
+
+    #[test]
+    fn overlapping_colored_lights_clamp_and_mix_deterministically() {
+        let warm = light(Color::from_rgba(255, 132, 64, 255));
+        let cool = light(Color::from_rgba(128, 214, 255, 255));
+        let sample = light_at(Vec2::ZERO, Biome::Town, &[warm, cool]);
+        let reversed = light_at(Vec2::ZERO, Biome::Town, &[cool, warm]);
+
+        assert!(sample.r <= MAX_LIGHT_CHANNEL);
+        assert!(sample.g <= MAX_LIGHT_CHANNEL);
+        assert!(sample.b <= MAX_LIGHT_CHANNEL);
+        assert!((sample.r - reversed.r).abs() < f32::EPSILON);
+        assert!((sample.g - reversed.g).abs() < f32::EPSILON);
+        assert!((sample.b - reversed.b).abs() < f32::EPSILON);
+        assert!(sample.r > 0.0);
+        assert!(sample.b > 0.0);
+    }
 }
