@@ -1,6 +1,10 @@
 use macroquad::prelude::*;
 
-use crate::{game::Game, render::with_alpha, world::World};
+use crate::{
+    game::{AbilityKind, Game},
+    render::with_alpha,
+    world::World,
+};
 
 use super::widgets::{
     draw_alert_icon, draw_hotkey_badge, draw_hotkey_hint, hotkey_badge_width, wrap_text,
@@ -100,9 +104,11 @@ pub(crate) fn draw(game: &Game) {
     );
     let mut bottom_x = 22.0;
     for (index, ability) in game.player.bound_abilities.iter().copied().enumerate() {
+        let cooldown = game.player.ability_cooldowns[ability.index()];
         bottom_x += draw_ability_hint(
             &(index + 1).to_string(),
-            &ability.name().to_lowercase(),
+            ability,
+            cooldown,
             vec2(bottom_x, bar_y + 17.0),
         ) + 14.0;
     }
@@ -144,16 +150,65 @@ fn draw_alerting_hotkey_hint(label: &str, text: &str, pos: Vec2, alert: bool) ->
     width
 }
 
-fn draw_ability_hint(label: &str, text: &str, pos: Vec2) -> f32 {
-    let badge_w = draw_hotkey_badge(label, pos);
+fn draw_ability_hint(label: &str, ability: AbilityKind, cooldown: f32, pos: Vec2) -> f32 {
+    let badge_w = if cooldown > 0.0 {
+        draw_cooldown_badge(label, ability, cooldown, pos)
+    } else {
+        draw_hotkey_badge(label, pos)
+    };
+    let text = ability.name().to_lowercase();
     draw_text(
-        text,
+        &text,
         pos.x + badge_w + 8.0,
         pos.y + 18.0,
         17.0,
-        Color::from_rgba(210, 214, 220, 255),
+        if cooldown > 0.0 {
+            Color::from_rgba(160, 164, 172, 255)
+        } else {
+            Color::from_rgba(210, 214, 220, 255)
+        },
     );
-    badge_w + 8.0 + measure_text(text, None, 17, 1.0).width
+    badge_w + 8.0 + measure_text(&text, None, 17, 1.0).width
+}
+
+fn draw_cooldown_badge(label: &str, ability: AbilityKind, cooldown: f32, pos: Vec2) -> f32 {
+    let badge_w = hotkey_badge_width(label);
+    draw_rectangle(
+        pos.x.round(),
+        pos.y.round(),
+        badge_w,
+        24.0,
+        with_alpha(Color::from_rgba(24, 26, 32, 255), 0.96),
+    );
+    if cooldown > 0.0 {
+        let fill_ratio = (cooldown / ability.cooldown()).clamp(0.0, 1.0);
+        let fill_h = 24.0 * fill_ratio;
+        draw_rectangle(
+            pos.x.round(),
+            pos.y.round() + 24.0 - fill_h,
+            badge_w,
+            fill_h,
+            with_alpha(ability.color(), 0.28),
+        );
+        let text = format!("{:.1}", cooldown);
+        let dims = measure_text(&text, None, 13, 1.0);
+        draw_text(
+            &text,
+            pos.x + ((badge_w - dims.width) * 0.5).round(),
+            pos.y + 17.0,
+            13.0,
+            WHITE,
+        );
+    }
+    draw_rectangle_lines(
+        pos.x.round() + 0.5,
+        pos.y.round() + 0.5,
+        badge_w - 1.0,
+        23.0,
+        1.0,
+        with_alpha(ability.color(), 0.9),
+    );
+    badge_w
 }
 
 fn draw_skill_feedback(game: &Game) {

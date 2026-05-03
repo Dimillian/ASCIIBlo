@@ -106,6 +106,7 @@ impl PreviewMode {
 
         match self {
             PreviewMode::Gameplay => {
+                game.player.ability_cooldowns[AbilityKind::Cleave.index()] = 1.3;
                 game.log = vec![
                     "The bell in Ember Town rings. Go make trouble.".into(),
                     "You hit Slime for 14.".into(),
