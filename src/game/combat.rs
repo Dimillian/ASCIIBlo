@@ -2,13 +2,14 @@ use ::rand::RngExt;
 use macroquad::prelude::*;
 
 use crate::{
-    content::{monster_damage, monster_xp, roll_item},
+    content::{MonsterAttackStyle, RangedAttackDef, monster_damage, monster_xp, roll_item},
     world::World,
 };
 
 use super::{
-    AbilityKind, DisciplineKind, FloatingText, Game, Loot, MONSTER_RADIUS, MeteorStrike, Monster,
-    PASSIVE_AGGRO_RADIUS, Particle, Projectile, Pulse, SlashArc, events::GameplayEvent,
+    AbilityKind, DisciplineKind, FloatingText, Game, Loot, MONSTER_DISENGAGE_RADIUS,
+    MONSTER_PACK_ALERT_RADIUS, MONSTER_RADIUS, MeteorStrike, Monster, PASSIVE_AGGRO_RADIUS,
+    PLAYER_RADIUS, Particle, Projectile, ProjectileKind, Pulse, SlashArc, events::GameplayEvent,
 };
 
 #[derive(Clone, Copy)]
@@ -57,32 +58,50 @@ impl Game {
 
     pub(super) fn update_projectiles(&mut self, dt: f32) {
         let mut active = Vec::with_capacity(self.fx.projectiles.len());
-        let mut impacts = Vec::new();
+        let mut player_impacts = Vec::new();
+        let mut monster_impacts = Vec::new();
         for mut projectile in self.fx.projectiles.drain(..) {
             projectile.ttl -= dt;
             projectile.pos += projectile.vel * dt;
-            let hits_monster =
-                self.sim.monsters.iter().any(|monster| {
-                    monster.pos.distance(projectile.pos) <= projectile.radius + 12.0
-                });
-            if projectile.ttl <= 0.0
-                || hits_monster
-                || self
-                    .world
-                    .collides_circle(projectile.pos, projectile.radius)
-            {
-                impacts.push(projectile);
-            } else {
-                active.push(projectile);
+            let hits_wall = self
+                .world
+                .collides_circle(projectile.pos, projectile.radius);
+            match &projectile.kind {
+                ProjectileKind::PlayerAbility(_) => {
+                    let hits_monster = self.sim.monsters.iter().any(|monster| {
+                        monster.pos.distance(projectile.pos) <= projectile.radius + 12.0
+                    });
+                    if projectile.ttl <= 0.0 || hits_monster || hits_wall {
+                        player_impacts.push(projectile);
+                    } else {
+                        active.push(projectile);
+                    }
+                }
+                ProjectileKind::MonsterBolt { .. } => {
+                    let hits_player = self.sim.player.pos.distance(projectile.pos)
+                        <= projectile.radius + PLAYER_RADIUS;
+                    if hits_player {
+                        monster_impacts.push(projectile);
+                    } else if projectile.ttl > 0.0 && !hits_wall {
+                        active.push(projectile);
+                    }
+                }
             }
         }
         self.fx.projectiles = active;
-        for projectile in impacts {
-            match projectile.ability {
+        for projectile in player_impacts {
+            let ability = match &projectile.kind {
+                ProjectileKind::PlayerAbility(ability) => *ability,
+                ProjectileKind::MonsterBolt { .. } => continue,
+            };
+            match ability {
                 AbilityKind::Fireball => self.detonate_fireball(projectile),
                 AbilityKind::IceBolt => self.impact_ice_bolt(projectile),
                 _ => {}
             }
+        }
+        for projectile in monster_impacts {
+            self.impact_monster_projectile(projectile);
         }
     }
 
@@ -180,7 +199,8 @@ impl Game {
 
     pub(super) fn update_monsters(&mut self, dt: f32) {
         let player_pos = self.sim.player.pos;
-        let mut attacks = Vec::new();
+        let mut melee_attacks = Vec::new();
+        let mut ranged_attacks = Vec::new();
         for index in 0..self.sim.monsters.len() {
             let monster = &mut self.sim.monsters[index];
             monster.attack_cd = (monster.attack_cd - dt).max(0.0);
@@ -190,17 +210,38 @@ impl Game {
             monster.hit_offset *= 0.0003_f32.powf(dt);
             let to_player = player_pos - monster.pos;
             let distance = to_player.length();
-            if distance < 26.0 && monster.attack_cd <= 0.0 {
-                attacks.push(index);
-                monster.attack_cd = monster.kind.attack_cooldown();
-                continue;
+            if monster.engaged && distance > MONSTER_DISENGAGE_RADIUS {
+                monster.engaged = false;
             }
-            if distance < PASSIVE_AGGRO_RADIUS {
-                let chill_factor = if monster.chill_ttl > 0.0 { 0.55 } else { 1.0 };
-                monster.vel =
-                    to_player.normalize_or_zero() * monster.kind.move_speed() * chill_factor;
-            } else {
-                monster.vel *= 0.88;
+            let combat_active = monster.engaged || distance < PASSIVE_AGGRO_RADIUS;
+            let chill_factor = if monster.chill_ttl > 0.0 { 0.55 } else { 1.0 };
+            match monster.kind.attack_style() {
+                MonsterAttackStyle::Melee => {
+                    if combat_active && distance < 26.0 && monster.attack_cd <= 0.0 {
+                        melee_attacks.push(index);
+                        monster.attack_cd = monster.kind.attack_cooldown();
+                        continue;
+                    }
+                    if combat_active {
+                        monster.vel = to_player.normalize_or_zero()
+                            * monster.kind.move_speed()
+                            * chill_factor;
+                    } else {
+                        monster.vel *= 0.88;
+                    }
+                }
+                MonsterAttackStyle::Ranged(ranged) => {
+                    if combat_active {
+                        monster.vel =
+                            ranged_velocity(monster, to_player, distance, ranged) * chill_factor;
+                        if distance <= ranged.max_range && monster.attack_cd <= 0.0 {
+                            ranged_attacks.push((index, ranged));
+                            monster.attack_cd = monster.kind.attack_cooldown();
+                        }
+                    } else {
+                        monster.vel *= 0.88;
+                    }
+                }
             }
         }
 
@@ -220,7 +261,7 @@ impl Game {
             }
         }
 
-        for index in attacks {
+        for index in melee_attacks {
             if index >= self.sim.monsters.len() {
                 continue;
             }
@@ -233,17 +274,12 @@ impl Game {
             if damage < raw {
                 self.award_discipline_xp(DisciplineKind::Armor, 2);
             }
-            self.sim.player.hp -= damage;
-            self.emit(GameplayEvent::PlayerHit {
-                pos: self.sim.player.pos,
-                damage,
-                attacker_name: self.sim.monsters[index].display_name(),
-            });
-            if self.sim.player.hp <= 0.0 {
-                self.sim.player.hp = self.sim.player.max_hp();
-                self.sim.player.pos = World::tile_center(ivec2(0, 0));
-                self.sim.player.stats.gold = (self.sim.player.stats.gold as f32 * 0.8) as i32;
-                self.log("You wake at the town well, lighter in coin and pride.".into());
+            self.damage_player(damage, self.sim.monsters[index].display_name());
+        }
+
+        for (index, ranged) in ranged_attacks {
+            if index < self.sim.monsters.len() {
+                self.spawn_monster_projectile(index, ranged);
             }
         }
     }
@@ -285,7 +321,9 @@ impl Game {
             return;
         }
         let monster_pos = self.sim.monsters[index].pos;
+        let pack_id = self.sim.monsters[index].pack_id;
         let monster_name = self.sim.monsters[index].display_name();
+        self.alert_packmates(pack_id, monster_pos);
         self.sim.monsters[index].hp -= damage;
         self.sim.monsters[index].hit_flash = 0.12;
         self.sim.monsters[index].hit_offset = (monster_pos - self.sim.player.pos)
@@ -341,5 +379,80 @@ impl Game {
                 radius: self.runtime.rng.random_range(1.5..=4.0),
             });
         }
+    }
+
+    fn alert_packmates(&mut self, pack_id: u64, origin: Vec2) {
+        for monster in &mut self.sim.monsters {
+            if monster.pack_id == pack_id
+                && monster.pos.distance(origin) <= MONSTER_PACK_ALERT_RADIUS
+            {
+                monster.engaged = true;
+            }
+        }
+    }
+
+    fn spawn_monster_projectile(&mut self, index: usize, ranged: RangedAttackDef) {
+        let monster = &self.sim.monsters[index];
+        let direction = (self.sim.player.pos - monster.pos).normalize_or_zero();
+        if direction == Vec2::ZERO {
+            return;
+        }
+        let raw = monster_damage(monster.kind, monster.level, monster.rank)
+            + self.runtime.rng.random_range(-2.0..=3.0);
+        self.fx.projectiles.push(Projectile {
+            kind: ProjectileKind::MonsterBolt {
+                attacker_name: monster.display_name(),
+            },
+            pos: monster.pos + direction * 18.0,
+            vel: direction * ranged.projectile_speed,
+            ttl: ranged.max_range / ranged.projectile_speed + 0.08,
+            radius: ranged.projectile_radius,
+            damage: raw.max(1.0),
+            aoe_radius: 0.0,
+            color: ranged.projectile_color,
+        });
+    }
+
+    fn impact_monster_projectile(&mut self, projectile: Projectile) {
+        let attacker_name = match projectile.kind {
+            ProjectileKind::MonsterBolt { attacker_name } => attacker_name,
+            ProjectileKind::PlayerAbility(_) => return,
+        };
+        let raw = projectile.damage;
+        let damage = (raw - self.sim.player.armor() as f32).max(1.0);
+        if damage < raw {
+            self.award_discipline_xp(DisciplineKind::Armor, 2);
+        }
+        self.damage_player(damage, attacker_name);
+    }
+
+    fn damage_player(&mut self, damage: f32, attacker_name: String) {
+        self.sim.player.hp -= damage;
+        self.emit(GameplayEvent::PlayerHit {
+            pos: self.sim.player.pos,
+            damage,
+            attacker_name,
+        });
+        if self.sim.player.hp <= 0.0 {
+            self.sim.player.hp = self.sim.player.max_hp();
+            self.sim.player.pos = World::tile_center(ivec2(0, 0));
+            self.sim.player.stats.gold = (self.sim.player.stats.gold as f32 * 0.8) as i32;
+            self.log("You wake at the town well, lighter in coin and pride.".into());
+        }
+    }
+}
+
+fn ranged_velocity(
+    monster: &Monster,
+    to_player: Vec2,
+    distance: f32,
+    ranged: RangedAttackDef,
+) -> Vec2 {
+    if distance < ranged.retreat_distance {
+        -to_player.normalize_or_zero() * monster.kind.move_speed()
+    } else if distance > ranged.preferred_distance {
+        to_player.normalize_or_zero() * monster.kind.move_speed()
+    } else {
+        monster.vel * 0.72
     }
 }

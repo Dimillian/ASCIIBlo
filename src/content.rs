@@ -122,6 +122,22 @@ pub enum MonsterKind {
     Revenant,
 }
 
+#[derive(Clone, Copy)]
+pub struct RangedAttackDef {
+    pub preferred_distance: f32,
+    pub retreat_distance: f32,
+    pub max_range: f32,
+    pub projectile_speed: f32,
+    pub projectile_radius: f32,
+    pub projectile_color: Color,
+}
+
+#[derive(Clone, Copy)]
+pub enum MonsterAttackStyle {
+    Melee,
+    Ranged(RangedAttackDef),
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MonsterRank {
     Normal,
@@ -176,6 +192,32 @@ impl NpcKind {
 }
 
 impl MonsterKind {
+    pub fn attack_style(self) -> MonsterAttackStyle {
+        match self {
+            MonsterKind::Wisp => MonsterAttackStyle::Ranged(RangedAttackDef {
+                preferred_distance: 126.0,
+                retreat_distance: 82.0,
+                max_range: 184.0,
+                projectile_speed: 250.0,
+                projectile_radius: 5.0,
+                projectile_color: Color::from_rgba(112, 226, 255, 255),
+            }),
+            MonsterKind::Cinderling => MonsterAttackStyle::Ranged(RangedAttackDef {
+                preferred_distance: 118.0,
+                retreat_distance: 76.0,
+                max_range: 176.0,
+                projectile_speed: 230.0,
+                projectile_radius: 6.0,
+                projectile_color: Color::from_rgba(255, 136, 78, 255),
+            }),
+            _ => MonsterAttackStyle::Melee,
+        }
+    }
+
+    pub fn is_ranged(self) -> bool {
+        matches!(self.attack_style(), MonsterAttackStyle::Ranged(_))
+    }
+
     pub fn glyph(self) -> char {
         match self {
             MonsterKind::Imp => 'i',
@@ -431,6 +473,38 @@ pub fn roll_monster(rng: &mut StdRng, biome: Biome) -> MonsterKind {
         roll -= entry.weight;
     }
     table[0].kind
+}
+
+pub fn roll_melee_monster(rng: &mut StdRng, biome: Biome) -> Option<MonsterKind> {
+    roll_monster_matching(rng, biome, |kind| !kind.is_ranged())
+}
+
+pub fn roll_ranged_monster(rng: &mut StdRng, biome: Biome) -> Option<MonsterKind> {
+    roll_monster_matching(rng, biome, MonsterKind::is_ranged)
+}
+
+fn roll_monster_matching(
+    rng: &mut StdRng,
+    biome: Biome,
+    predicate: impl Fn(MonsterKind) -> bool,
+) -> Option<MonsterKind> {
+    let table = encounter_table(biome);
+    let total_weight: u32 = table
+        .iter()
+        .filter(|entry| predicate(entry.kind))
+        .map(|entry| entry.weight)
+        .sum();
+    if total_weight == 0 {
+        return None;
+    }
+    let mut roll = rng.random_range(0..total_weight);
+    for entry in table.iter().filter(|entry| predicate(entry.kind)) {
+        if roll < entry.weight {
+            return Some(entry.kind);
+        }
+        roll -= entry.weight;
+    }
+    None
 }
 
 pub fn scaled_monster_level(world_level: i32, player_level: i32) -> i32 {

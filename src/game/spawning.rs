@@ -4,7 +4,10 @@ use ::rand::RngExt;
 use macroquad::prelude::*;
 
 use crate::{
-    content::{MonsterRank, monster_max_hp, roll_monster, scaled_monster_level},
+    content::{
+        MonsterKind, MonsterRank, monster_max_hp, roll_melee_monster, roll_monster,
+        roll_ranged_monster, scaled_monster_level,
+    },
     world::World,
 };
 
@@ -16,6 +19,36 @@ use super::{
 
 const PACK_SIZE_WEIGHTS: [usize; 12] = [2, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 7];
 const SPAWN_VISIBILITY_MARGIN: f32 = 24.0;
+const MIXED_PACK_PERCENT: u32 = 35;
+
+#[derive(Clone, Copy)]
+pub(super) enum AmbientPackComposition {
+    Homogeneous(MonsterKind),
+    Mixed {
+        core_kind: MonsterKind,
+        support_kind: MonsterKind,
+        support_index: usize,
+    },
+}
+
+impl AmbientPackComposition {
+    pub(super) fn kind_for_member(self, member_index: usize) -> MonsterKind {
+        match self {
+            Self::Homogeneous(kind) => kind,
+            Self::Mixed {
+                core_kind,
+                support_kind,
+                support_index,
+            } => {
+                if member_index == support_index {
+                    support_kind
+                } else {
+                    core_kind
+                }
+            }
+        }
+    }
+}
 
 pub(super) fn monster_pack_rank_for_roll(roll: u32) -> MonsterRank {
     match roll {
@@ -40,13 +73,15 @@ impl Game {
                 continue;
             };
             let biome = self.world.biome_at_world(pack_center);
-            let kind = roll_monster(&mut self.runtime.rng, biome);
+            let homogeneous_kind = roll_monster(&mut self.runtime.rng, biome);
             let level = scaled_monster_level(
                 self.world.biome_level(pack_center),
                 self.sim.player.stats.level,
             );
             let pack_size =
                 PACK_SIZE_WEIGHTS[self.runtime.rng.random_range(0..PACK_SIZE_WEIGHTS.len())];
+            let composition =
+                self.roll_ambient_pack_composition(biome, pack_size, homogeneous_kind);
             let rare_index = self.runtime.rng.random_range(0..pack_size);
             let rare_rank = self.roll_pack_rank();
             let pack_id = self.runtime.next_monster_pack_id;
@@ -62,6 +97,7 @@ impl Game {
                     pack.clear();
                     break;
                 };
+                let kind = composition.kind_for_member(member_index);
                 let max_hp = monster_max_hp(kind, level, rank);
                 pack.push(super::Monster {
                     kind,
@@ -76,6 +112,7 @@ impl Game {
                     max_hp,
                     level,
                     attack_cd: self.runtime.rng.random_range(0.0..kind.attack_cooldown()),
+                    engaged: false,
                     wobble: self.runtime.rng.random_range(0.0..10.0),
                     hit_flash: 0.0,
                     chill_ttl: 0.0,
@@ -155,6 +192,26 @@ impl Game {
         monster_pack_rank_for_roll(self.runtime.rng.random_range(0..100))
     }
 
+    fn roll_ambient_pack_composition(
+        &mut self,
+        biome: crate::world::Biome,
+        pack_size: usize,
+        homogeneous_kind: MonsterKind,
+    ) -> AmbientPackComposition {
+        if should_spawn_mixed_pack(self.runtime.rng.random_range(0..100))
+            && let Some((core_kind, support_kind)) =
+                roll_melee_monster(&mut self.runtime.rng, biome)
+                    .zip(roll_ranged_monster(&mut self.runtime.rng, biome))
+        {
+            return AmbientPackComposition::Mixed {
+                core_kind,
+                support_kind,
+                support_index: self.runtime.rng.random_range(0..pack_size),
+            };
+        }
+        AmbientPackComposition::Homogeneous(homogeneous_kind)
+    }
+
     pub(super) fn cull_distant_monsters(&mut self) {
         self.sim.monsters.retain(|monster| {
             monster.quest_id.is_some()
@@ -176,6 +233,10 @@ impl Game {
             self.spawn_monster_packs(MONSTER_LOCAL_PACK_TARGET - nearby_pack_ids.len());
         }
     }
+}
+
+pub(super) fn should_spawn_mixed_pack(roll: u32) -> bool {
+    roll < MIXED_PACK_PERCENT
 }
 
 pub(super) fn pack_center_can_be_seen_with_view(

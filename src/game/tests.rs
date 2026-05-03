@@ -2,7 +2,9 @@ use super::*;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    content::{Item, MonsterKind, MonsterRank, Rarity, Slot, monster_xp, roll_item},
+    content::{
+        Item, MonsterAttackStyle, MonsterKind, MonsterRank, Rarity, Slot, monster_xp, roll_item,
+    },
     stat_display::item_summary,
 };
 
@@ -20,6 +22,7 @@ fn test_monster(kind: MonsterKind, pos: Vec2) -> Monster {
         max_hp: 80.0,
         level: 1,
         attack_cd: 0.0,
+        engaged: false,
         wobble: 0.0,
         hit_flash: 0.0,
         chill_ttl: 0.0,
@@ -96,6 +99,7 @@ fn leveling_grants_only_stat_points() {
         max_hp: MonsterKind::Imp.max_hp(),
         level: 1,
         attack_cd: 0.0,
+        engaged: false,
         wobble: 0.0,
         hit_flash: 0.0,
         chill_ttl: 0.0,
@@ -229,6 +233,26 @@ fn each_quest_archetype_spawns_concrete_targets() {
             .quest_items
             .iter()
             .all(|item| { recover_game.world.walkable_at_world(item.pos) })
+    );
+}
+
+#[test]
+fn quest_kill_packs_remain_homogeneous() {
+    let mut game = Game::new(31);
+    let giver = origin_town(&game);
+    let quest = game.generate_kill_pack_quest(giver).unwrap();
+    let quest_monsters: Vec<&Monster> = game
+        .sim
+        .monsters
+        .iter()
+        .filter(|monster| monster.quest_id == Some(quest.id))
+        .collect();
+
+    assert!(!quest_monsters.is_empty());
+    assert!(
+        quest_monsters
+            .iter()
+            .all(|monster| monster.kind == quest_monsters[0].kind)
     );
 }
 
@@ -439,7 +463,7 @@ fn walking_far_from_town_repopulates_monsters_around_the_player() {
 }
 
 #[test]
-fn spawned_monster_packs_are_homogeneous_and_clustered() {
+fn spawned_monster_packs_are_clustered_and_use_at_most_one_ranged_support() {
     let mut game = Game::new(2);
     game.sim.monsters.clear();
     game.runtime.next_monster_pack_id = 0;
@@ -454,7 +478,21 @@ fn spawned_monster_packs_are_homogeneous_and_clustered() {
     assert_eq!(packs.len(), MONSTER_LOCAL_PACK_TARGET);
     for pack in packs.values() {
         assert!((2..=7).contains(&pack.len()));
-        assert!(pack.iter().all(|monster| monster.kind == pack[0].kind));
+        let ranged_count = pack
+            .iter()
+            .filter(|monster| monster.kind.is_ranged())
+            .count();
+        assert!(ranged_count <= 1 || pack.iter().all(|monster| monster.kind.is_ranged()));
+        if ranged_count == 1 {
+            assert!(
+                pack.iter()
+                    .filter(|monster| !monster.kind.is_ranged())
+                    .count()
+                    >= 1
+            );
+        } else {
+            assert!(pack.iter().all(|monster| monster.kind == pack[0].kind));
+        }
         assert!(
             pack.iter()
                 .all(|monster| monster.pack_center == pack[0].pack_center)
@@ -471,6 +509,45 @@ fn spawned_monster_packs_are_homogeneous_and_clustered() {
                 <= 1
         );
     }
+}
+
+#[test]
+fn ambient_mixed_pack_roll_threshold_is_explicit() {
+    assert!(super::spawning::should_spawn_mixed_pack(0));
+    assert!(super::spawning::should_spawn_mixed_pack(34));
+    assert!(!super::spawning::should_spawn_mixed_pack(35));
+}
+
+#[test]
+fn ambient_pack_composition_keeps_homogeneous_packs_uniform() {
+    let composition = super::spawning::AmbientPackComposition::Homogeneous(MonsterKind::Imp);
+
+    assert_eq!(composition.kind_for_member(0), MonsterKind::Imp);
+    assert_eq!(composition.kind_for_member(4), MonsterKind::Imp);
+}
+
+#[test]
+fn ambient_pack_composition_places_exactly_one_ranged_support() {
+    let composition = super::spawning::AmbientPackComposition::Mixed {
+        core_kind: MonsterKind::Brute,
+        support_kind: MonsterKind::Wisp,
+        support_index: 2,
+    };
+
+    let kinds: Vec<MonsterKind> = (0..5)
+        .map(|index| composition.kind_for_member(index))
+        .collect();
+
+    assert_eq!(
+        kinds,
+        vec![
+            MonsterKind::Brute,
+            MonsterKind::Brute,
+            MonsterKind::Wisp,
+            MonsterKind::Brute,
+            MonsterKind::Brute,
+        ]
+    );
 }
 
 #[test]
@@ -580,6 +657,7 @@ fn hovered_monster_prefers_the_enemy_under_the_cursor() {
             max_hp: 24.0,
             level: 1,
             attack_cd: 0.0,
+            engaged: false,
             wobble: 0.0,
             hit_flash: 0.0,
             chill_ttl: 0.0,
@@ -597,6 +675,7 @@ fn hovered_monster_prefers_the_enemy_under_the_cursor() {
             max_hp: 62.0,
             level: 2,
             attack_cd: 0.0,
+            engaged: false,
             wobble: 0.0,
             hit_flash: 0.0,
             chill_ttl: 0.0,
@@ -806,6 +885,7 @@ fn gameplay_smoke_flow_reaches_combat_loot_shop_and_travel() {
         max_hp: 1.0,
         level: 1,
         attack_cd: 0.0,
+        engaged: false,
         wobble: 0.0,
         hit_flash: 0.0,
         chill_ttl: 0.0,
@@ -886,6 +966,7 @@ fn fireball_explodes_and_hits_nearby_monsters() {
             max_hp: 80.0,
             level: 1,
             attack_cd: 0.0,
+            engaged: false,
             wobble: 0.0,
             hit_flash: 0.0,
             chill_ttl: 0.0,
@@ -903,6 +984,7 @@ fn fireball_explodes_and_hits_nearby_monsters() {
             max_hp: 80.0,
             level: 1,
             attack_cd: 0.0,
+            engaged: false,
             wobble: 0.0,
             hit_flash: 0.0,
             chill_ttl: 0.0,
@@ -920,6 +1002,7 @@ fn fireball_explodes_and_hits_nearby_monsters() {
             max_hp: 80.0,
             level: 1,
             attack_cd: 0.0,
+            engaged: false,
             wobble: 0.0,
             hit_flash: 0.0,
             chill_ttl: 0.0,
@@ -968,6 +1051,7 @@ fn hitting_monster_sets_flash_and_recoil() {
         max_hp: 80.0,
         level: 1,
         attack_cd: 0.0,
+        engaged: false,
         wobble: 0.0,
         hit_flash: 0.0,
         chill_ttl: 0.0,
@@ -978,6 +1062,117 @@ fn hitting_monster_sets_flash_and_recoil() {
     assert!(game.sim.monsters[0].hit_flash > 0.0);
     assert!(game.sim.monsters[0].hit_offset.x > 0.0);
     assert_eq!(game.sim.player.disciplines.melee.xp, 2);
+}
+
+#[test]
+fn damaging_a_monster_alerts_nearby_packmates_only() {
+    let mut game = Game::new(26);
+    let origin = game.sim.player.pos + vec2(40.0, 0.0);
+    let mut struck = test_monster(MonsterKind::Imp, origin);
+    struck.pack_center = origin;
+    let mut nearby_packmate = test_monster(MonsterKind::Slime, origin + vec2(72.0, 0.0));
+    nearby_packmate.pack_center = origin;
+    let mut distant_packmate = test_monster(
+        MonsterKind::Brute,
+        origin + vec2(MONSTER_PACK_ALERT_RADIUS + 12.0, 0.0),
+    );
+    distant_packmate.pack_center = origin;
+    let mut other_pack = test_monster(MonsterKind::Hound, origin + vec2(32.0, 0.0));
+    other_pack.pack_id = 1;
+    other_pack.pack_center = origin;
+    game.sim.monsters = vec![struck, nearby_packmate, distant_packmate, other_pack];
+
+    game.hit_monster(0, 1.0, false);
+
+    assert!(game.sim.monsters[0].engaged);
+    assert!(game.sim.monsters[1].engaged);
+    assert!(!game.sim.monsters[2].engaged);
+    assert!(!game.sim.monsters[3].engaged);
+}
+
+#[test]
+fn engaged_monsters_disengage_after_the_player_leashes_them() {
+    let mut game = Game::new(27);
+    let mut monster = test_monster(
+        MonsterKind::Imp,
+        game.sim.player.pos + vec2(MONSTER_DISENGAGE_RADIUS + 12.0, 0.0),
+    );
+    monster.engaged = true;
+    game.sim.monsters = vec![monster];
+
+    game.update_monsters(FIXED_DT);
+
+    assert!(!game.sim.monsters[0].engaged);
+}
+
+#[test]
+fn wisps_and_cinderlings_are_ranged_monsters() {
+    assert!(matches!(
+        MonsterKind::Wisp.attack_style(),
+        MonsterAttackStyle::Ranged(_)
+    ));
+    assert!(matches!(
+        MonsterKind::Cinderling.attack_style(),
+        MonsterAttackStyle::Ranged(_)
+    ));
+    assert!(matches!(
+        MonsterKind::Imp.attack_style(),
+        MonsterAttackStyle::Melee
+    ));
+}
+
+#[test]
+fn ranged_monsters_fire_hostile_projectiles() {
+    let mut game = Game::new(28);
+    let mut monster = test_monster(MonsterKind::Wisp, game.sim.player.pos + vec2(120.0, 0.0));
+    monster.engaged = true;
+    game.sim.monsters = vec![monster];
+
+    game.update_monsters(FIXED_DT);
+
+    assert_eq!(game.fx.projectiles.len(), 1);
+    assert!(matches!(
+        game.fx.projectiles[0].kind,
+        ProjectileKind::MonsterBolt { .. }
+    ));
+}
+
+#[test]
+fn hostile_projectiles_hit_the_player_and_disappear() {
+    let mut game = Game::new(29);
+    let hp_before = game.sim.player.hp;
+    game.fx.projectiles.push(Projectile {
+        kind: ProjectileKind::MonsterBolt {
+            attacker_name: "Wisp".into(),
+        },
+        pos: game.sim.player.pos,
+        vel: Vec2::ZERO,
+        ttl: 1.0,
+        radius: 5.0,
+        damage: 12.0,
+        aoe_radius: 0.0,
+        color: Color::from_rgba(112, 226, 255, 255),
+    });
+
+    game.update_projectiles(FIXED_DT);
+
+    assert!(game.fx.projectiles.is_empty());
+    assert!(game.sim.player.hp < hp_before);
+}
+
+#[test]
+fn ranged_monsters_retreat_when_close_and_approach_when_far() {
+    let mut game = Game::new(30);
+    let mut close = test_monster(MonsterKind::Wisp, game.sim.player.pos + vec2(40.0, 0.0));
+    close.engaged = true;
+    game.sim.monsters = vec![close];
+    game.update_monsters(FIXED_DT);
+    assert!(game.sim.monsters[0].vel.x > 0.0);
+
+    game.sim.monsters[0].pos = game.sim.player.pos + vec2(170.0, 0.0);
+    game.sim.monsters[0].attack_cd = 1.0;
+    game.update_monsters(FIXED_DT);
+    assert!(game.sim.monsters[0].vel.x < 0.0);
 }
 
 #[test]
@@ -997,6 +1192,7 @@ fn cleave_hits_front_arc_without_hitting_behind() {
             max_hp: 80.0,
             level: 1,
             attack_cd: 0.0,
+            engaged: false,
             wobble: 0.0,
             hit_flash: 0.0,
             chill_ttl: 0.0,
@@ -1014,6 +1210,7 @@ fn cleave_hits_front_arc_without_hitting_behind() {
             max_hp: 80.0,
             level: 1,
             attack_cd: 0.0,
+            engaged: false,
             wobble: 0.0,
             hit_flash: 0.0,
             chill_ttl: 0.0,
@@ -1306,6 +1503,7 @@ fn armor_mastery_gains_xp_when_damage_is_mitigated() {
         max_hp: 24.0,
         level: 1,
         attack_cd: 0.0,
+        engaged: false,
         wobble: 0.0,
         hit_flash: 0.0,
         chill_ttl: 0.0,

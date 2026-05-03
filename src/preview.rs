@@ -5,8 +5,9 @@ use macroquad::prelude::{Color, Vec2, ivec2};
 use crate::{
     content::{Item, Rarity, Slot},
     game::{
-        AbilityKind, DisciplineKind, Game, Loot, Monster, Notification, Projectile, Pulse, Quest,
-        QuestKind, QuestReward, QuestStage, ShopTab, SkillBookFocus, SkillXpToast, UiMode,
+        AbilityKind, DisciplineKind, Game, Loot, Monster, Notification, Projectile, ProjectileKind,
+        Pulse, Quest, QuestKind, QuestReward, QuestStage, ShopTab, SkillBookFocus, SkillXpToast,
+        UiMode,
     },
     world::{SettlementSite, SettlementTier},
 };
@@ -159,6 +160,7 @@ impl PreviewMode {
                     max_hp: 72.0,
                     level: 3,
                     attack_cd: 0.0,
+                    engaged: false,
                     wobble: 0.0,
                     hit_flash: 0.0,
                     chill_ttl: 0.0,
@@ -168,7 +170,7 @@ impl PreviewMode {
             PreviewMode::Lighting => {
                 game.sim.monsters.clear();
                 game.fx.projectiles.push(Projectile {
-                    ability: AbilityKind::Fireball,
+                    kind: ProjectileKind::PlayerAbility(AbilityKind::Fireball),
                     pos: game.sim.player.pos + Vec2::new(76.0, -18.0),
                     vel: Vec2::new(160.0, 0.0),
                     ttl: 0.95,

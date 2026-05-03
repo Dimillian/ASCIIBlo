@@ -1,8 +1,8 @@
 use macroquad::prelude::*;
 
 use super::{
-    AbilityKind, DisciplineKind, Game, MeteorStrike, PLAYER_RADIUS, Projectile, Pulse, SlashArc,
-    combat::DamageKind,
+    AbilityKind, DisciplineKind, Game, MeteorStrike, PLAYER_RADIUS, Projectile, ProjectileKind,
+    Pulse, SlashArc, combat::DamageKind,
 };
 
 impl Game {
@@ -113,7 +113,7 @@ impl Game {
         let direction = self.sim.player.facing.normalize_or_zero();
         let damage = self.roll_player_damage(DamageKind::MagicSkill) + 8.0;
         self.fx.projectiles.push(Projectile {
-            ability: AbilityKind::Fireball,
+            kind: ProjectileKind::PlayerAbility(AbilityKind::Fireball),
             pos: self.sim.player.pos + direction * 20.0,
             vel: direction * 320.0,
             ttl: 0.95,
@@ -239,7 +239,7 @@ impl Game {
         let direction = self.sim.player.facing.normalize_or_zero();
         let damage = self.roll_player_damage(DamageKind::MagicSkill) + 6.0;
         self.fx.projectiles.push(Projectile {
-            ability: AbilityKind::IceBolt,
+            kind: ProjectileKind::PlayerAbility(AbilityKind::IceBolt),
             pos: self.sim.player.pos + direction * 20.0,
             vel: direction * 380.0,
             ttl: 0.8,

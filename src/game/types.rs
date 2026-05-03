@@ -410,6 +410,7 @@ pub struct Monster {
     pub max_hp: f32,
     pub level: i32,
     pub attack_cd: f32,
+    pub engaged: bool,
     pub wobble: f32,
     pub hit_flash: f32,
     pub chill_ttl: f32,
@@ -601,8 +602,13 @@ pub struct SlashArc {
     pub color: Color,
 }
 
+pub enum ProjectileKind {
+    PlayerAbility(AbilityKind),
+    MonsterBolt { attacker_name: String },
+}
+
 pub struct Projectile {
-    pub ability: AbilityKind,
+    pub kind: ProjectileKind,
     pub pos: Vec2,
     pub vel: Vec2,
     pub ttl: f32,
