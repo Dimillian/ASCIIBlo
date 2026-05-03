@@ -242,6 +242,8 @@ impl Game {
             let monster = &mut self.monsters[index];
             monster.attack_cd = (monster.attack_cd - dt).max(0.0);
             monster.wobble += dt * 5.0;
+            monster.hit_flash = (monster.hit_flash - dt).max(0.0);
+            monster.hit_offset *= 0.0003_f32.powf(dt);
             let to_player = player_pos - monster.pos;
             let distance = to_player.length();
             if distance < 26.0 && monster.attack_cd <= 0.0 {
@@ -325,6 +327,9 @@ impl Game {
         let monster_pos = self.monsters[index].pos;
         let monster_name = self.monsters[index].kind.name();
         self.monsters[index].hp -= damage;
+        self.monsters[index].hit_flash = 0.12;
+        self.monsters[index].hit_offset =
+            (monster_pos - self.player.pos).normalize_or_zero() * if flashy { 10.0 } else { 6.0 };
         self.floating.push(FloatingText {
             pos: monster_pos,
             text: format!("-{}", damage.round() as i32),
@@ -360,6 +365,12 @@ impl Game {
         let xp = monster_xp(monster.kind, monster.level);
         self.player.stats.xp += xp;
         self.player.stats.gold += self.rng.random_range(1..=7);
+        self.pulses.push(Pulse {
+            pos: monster.pos,
+            radius: 10.0,
+            ttl: 0.24,
+            color: monster.kind.color(),
+        });
         self.floating.push(FloatingText {
             pos: monster.pos,
             text: format!("+{} xp", xp),

@@ -305,7 +305,7 @@ impl Game {
     }
 
     pub fn camera_focus(&self) -> Vec2 {
-        self.player.pos
+        self.player.pos + self.player.vel * 0.14
     }
 
     pub fn hovered_monster(&self) -> Option<&Monster> {

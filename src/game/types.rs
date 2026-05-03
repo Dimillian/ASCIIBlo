@@ -103,11 +103,13 @@ pub struct Monster {
     pub kind: MonsterKind,
     pub pos: Vec2,
     pub vel: Vec2,
+    pub hit_offset: Vec2,
     pub hp: f32,
     pub max_hp: f32,
     pub level: i32,
     pub attack_cd: f32,
     pub wobble: f32,
+    pub hit_flash: f32,
 }
 
 pub struct Loot {

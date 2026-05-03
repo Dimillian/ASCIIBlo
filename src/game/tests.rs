@@ -9,11 +9,13 @@ fn leveling_grants_spendable_points() {
         kind: MonsterKind::Imp,
         pos: game.player.pos + vec2(40.0, 0.0),
         vel: Vec2::ZERO,
+        hit_offset: Vec2::ZERO,
         hp: 0.0,
         max_hp: MonsterKind::Imp.max_hp(),
         level: 1,
         attack_cd: 0.0,
         wobble: 0.0,
+        hit_flash: 0.0,
     });
 
     assert_eq!(game.player.stats.level, 2);
@@ -98,21 +100,25 @@ fn hovered_monster_prefers_the_enemy_under_the_cursor() {
             kind: MonsterKind::Imp,
             pos: game.player.pos + vec2(20.0, 0.0),
             vel: Vec2::ZERO,
+            hit_offset: Vec2::ZERO,
             hp: 12.0,
             max_hp: 24.0,
             level: 1,
             attack_cd: 0.0,
             wobble: 0.0,
+            hit_flash: 0.0,
         },
         Monster {
             kind: MonsterKind::Brute,
             pos: game.player.pos + vec2(24.0, 0.0),
             vel: Vec2::ZERO,
+            hit_offset: Vec2::ZERO,
             hp: 48.0,
             max_hp: 62.0,
             level: 2,
             attack_cd: 0.0,
             wobble: 0.0,
+            hit_flash: 0.0,
         },
     ];
     game.input.aim_world = game.player.pos + vec2(24.0, 0.0);
@@ -178,11 +184,13 @@ fn gameplay_smoke_flow_reaches_combat_loot_shop_and_travel() {
         kind: MonsterKind::Imp,
         pos: game.player.pos + vec2(32.0, 0.0),
         vel: Vec2::ZERO,
+        hit_offset: Vec2::ZERO,
         hp: 1.0,
         max_hp: 1.0,
         level: 1,
         attack_cd: 0.0,
         wobble: 0.0,
+        hit_flash: 0.0,
     });
 
     game.basic_attack();
@@ -240,31 +248,37 @@ fn fireball_explodes_and_hits_nearby_monsters() {
             kind: MonsterKind::Imp,
             pos: game.player.pos + vec2(34.0, 0.0),
             vel: Vec2::ZERO,
+            hit_offset: Vec2::ZERO,
             hp: 80.0,
             max_hp: 80.0,
             level: 1,
             attack_cd: 0.0,
             wobble: 0.0,
+            hit_flash: 0.0,
         },
         Monster {
             kind: MonsterKind::Slime,
             pos: game.player.pos + vec2(48.0, 10.0),
             vel: Vec2::ZERO,
+            hit_offset: Vec2::ZERO,
             hp: 80.0,
             max_hp: 80.0,
             level: 1,
             attack_cd: 0.0,
             wobble: 0.0,
+            hit_flash: 0.0,
         },
         Monster {
             kind: MonsterKind::Brute,
             pos: game.player.pos + vec2(120.0, 0.0),
             vel: Vec2::ZERO,
+            hit_offset: Vec2::ZERO,
             hp: 80.0,
             max_hp: 80.0,
             level: 1,
             attack_cd: 0.0,
             wobble: 0.0,
+            hit_flash: 0.0,
         },
     ];
     game.player.facing = Vec2::X;
@@ -292,6 +306,29 @@ fn basic_attack_spawns_a_short_slash_arc() {
 }
 
 #[test]
+fn hitting_monster_sets_flash_and_recoil() {
+    let mut game = Game::new(12);
+    game.player.facing = Vec2::X;
+    game.monsters = vec![Monster {
+        kind: MonsterKind::Imp,
+        pos: game.player.pos + vec2(32.0, 0.0),
+        vel: Vec2::ZERO,
+        hit_offset: Vec2::ZERO,
+        hp: 80.0,
+        max_hp: 80.0,
+        level: 1,
+        attack_cd: 0.0,
+        wobble: 0.0,
+        hit_flash: 0.0,
+    }];
+
+    game.basic_attack();
+
+    assert!(game.monsters[0].hit_flash > 0.0);
+    assert!(game.monsters[0].hit_offset.x > 0.0);
+}
+
+#[test]
 fn cleave_hits_front_arc_without_hitting_behind() {
     let mut game = Game::new(8);
     game.monsters = vec![
@@ -299,21 +336,25 @@ fn cleave_hits_front_arc_without_hitting_behind() {
             kind: MonsterKind::Imp,
             pos: game.player.pos + vec2(36.0, 0.0),
             vel: Vec2::ZERO,
+            hit_offset: Vec2::ZERO,
             hp: 80.0,
             max_hp: 80.0,
             level: 1,
             attack_cd: 0.0,
             wobble: 0.0,
+            hit_flash: 0.0,
         },
         Monster {
             kind: MonsterKind::Slime,
             pos: game.player.pos + vec2(-36.0, 0.0),
             vel: Vec2::ZERO,
+            hit_offset: Vec2::ZERO,
             hp: 80.0,
             max_hp: 80.0,
             level: 1,
             attack_cd: 0.0,
             wobble: 0.0,
+            hit_flash: 0.0,
         },
     ];
     game.player.facing = Vec2::X;

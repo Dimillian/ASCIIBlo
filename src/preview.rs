@@ -110,11 +110,13 @@ impl PreviewMode {
                     kind: crate::content::MonsterKind::Brute,
                     pos: game.player.pos + Vec2::new(42.0, 0.0),
                     vel: Vec2::ZERO,
+                    hit_offset: Vec2::ZERO,
                     hp: 41.0,
                     max_hp: 72.0,
                     level: 3,
                     attack_cd: 0.0,
                     wobble: 0.0,
+                    hit_flash: 0.0,
                 });
                 game.preview_hover_world = Some(game.player.pos + Vec2::new(42.0, 0.0));
             }

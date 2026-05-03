@@ -48,11 +48,13 @@ impl Game {
                 kind,
                 pos,
                 vel: Vec2::ZERO,
+                hit_offset: Vec2::ZERO,
                 hp: max_hp,
                 max_hp,
                 level,
                 attack_cd: self.rng.random_range(0.0..kind.attack_cooldown()),
                 wobble: self.rng.random_range(0.0..10.0),
+                hit_flash: 0.0,
             });
             break;
         }
