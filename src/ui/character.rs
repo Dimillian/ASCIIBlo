@@ -49,8 +49,7 @@ pub(crate) fn draw(game: &Game) {
             label: "Agility",
             value: game.sim.player.stats.agility.to_string(),
             detail: format!(
-                "Agility raises haste and critical hit chance. Current agility adds {} haste and sets crit chance to {:.0}%.",
-                game.sim.player.stats.agility,
+                "Agility increases movement speed, shortens basic attack recovery, and raises critical hit chance. Current agility sets crit chance to {:.0}%.",
                 game.sim.player.crit_chance() * 100.0
             ),
             cursor_index: Some(1),
@@ -121,7 +120,7 @@ pub(crate) fn draw(game: &Game) {
             label: "Haste",
             value: game.sim.player.haste().to_string(),
             detail: format!(
-                "Haste increases movement speed and shortens basic attack recovery. Current value includes {} gear haste.",
+                "Increases movement speed and shortens basic attack recovery. Current value includes {} from gear.",
                 game.sim.player.equipment.bonus_haste()
             ),
             cursor_index: None,
@@ -143,9 +142,10 @@ pub(crate) fn draw(game: &Game) {
         },
         StatRow {
             label: "Move speed",
-            value: format!("{:.0}", game.sim.player.move_speed()),
+            value: format!("{:.0}", game.sim.player.move_speed_rating()),
             detail:
-                "Movement speed starts at 150 and gains 4 for every point of haste.".into(),
+                "Movement speed starts at 100 and increases with Agility and certain gear bonuses."
+                    .into(),
             cursor_index: None,
         },
     ];

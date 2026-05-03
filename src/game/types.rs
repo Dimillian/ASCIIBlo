@@ -237,6 +237,10 @@ impl Player {
         150.0 + self.haste() as f32 * 4.0 + self.agility_mastery_bonus() as f32
     }
 
+    pub fn move_speed_rating(&self) -> f32 {
+        self.move_speed() - 70.0
+    }
+
     pub fn attack_interval(&self) -> f32 {
         (0.5 - self.haste() as f32 * 0.018).max(0.16)
     }

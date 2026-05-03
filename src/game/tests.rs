@@ -916,6 +916,20 @@ fn agility_mastery_gains_xp_from_actual_travel() {
 }
 
 #[test]
+fn new_game_starts_with_previous_actual_move_speed() {
+    let game = Game::new(30);
+
+    assert_eq!(game.sim.player.move_speed(), 170.0);
+}
+
+#[test]
+fn new_game_displays_100_move_speed_rating() {
+    let game = Game::new(30);
+
+    assert_eq!(game.sim.player.move_speed_rating(), 100.0);
+}
+
+#[test]
 fn mastery_levels_improve_combat_and_movement_values() {
     let mut game = Game::new(16);
     let base_armor = game.sim.player.armor();
