@@ -1,6 +1,11 @@
 use macroquad::prelude::*;
 
-use crate::{content::Item, render::with_alpha};
+use crate::{
+    content::Item,
+    game::Player,
+    render::with_alpha,
+    stat_display::{item_bonus_labels, item_comparison_labels},
+};
 
 pub(crate) const ITEM_SELECTION: Color = Color::new(128.0 / 255.0, 214.0 / 255.0, 1.0, 1.0);
 
@@ -60,21 +65,6 @@ pub(crate) fn draw_label_inline(label: &str, value: &str, pos: Vec2, value_offse
         Color::from_rgba(180, 184, 190, 255),
     );
     draw_text(value, pos.x + value_offset, pos.y, 18.0, WHITE);
-}
-
-pub(crate) fn draw_stat_chip(label: &str, value: i32, pos: Vec2) {
-    draw_rectangle(pos.x, pos.y - 18.0, 62.0, 28.0, with_alpha(WHITE, 0.06));
-    draw_text(
-        &format!("{} {}", label, value),
-        pos.x + 8.0,
-        pos.y,
-        16.0,
-        if value > 0 {
-            WHITE
-        } else {
-            Color::from_rgba(120, 124, 132, 255)
-        },
-    );
 }
 
 pub(crate) fn draw_stat_value(label: &str, value: i32, pos: Vec2) {
@@ -145,32 +135,32 @@ pub(crate) fn draw_alert_icon(pos: Vec2) {
     draw_text("!", pos.x - 2.5, pos.y + 4.5, 13.0, WHITE);
 }
 
-pub(crate) fn draw_item_detail(item: &Item, pos: Vec2) {
+pub(crate) fn draw_item_detail(player: &Player, item: &Item, pos: Vec2, width: f32) {
     draw_text(&item.name, pos.x, pos.y, 22.0, item.rarity.color());
     draw_label_inline(
         "Quality",
         item.rarity.label(),
-        vec2(pos.x, pos.y + 34.0),
+        vec2(pos.x, pos.y + 28.0),
         68.0,
     );
     draw_label_inline(
         "Slot",
         item.slot.label(),
-        vec2(pos.x + 190.0, pos.y + 34.0),
+        vec2(pos.x + width * 0.48, pos.y + 28.0),
         42.0,
     );
-    draw_label_inline("Base", &item.base_name, vec2(pos.x, pos.y + 60.0), 68.0);
+    draw_label_inline("Base", &item.base_name, vec2(pos.x, pos.y + 50.0), 68.0);
     draw_label_inline(
         "Item lvl",
         &item.item_level.to_string(),
-        vec2(pos.x + 190.0, pos.y + 60.0),
+        vec2(pos.x + width * 0.48, pos.y + 50.0),
         70.0,
     );
 
     draw_text(
         "Affixes",
         pos.x,
-        pos.y + 88.0,
+        pos.y + 76.0,
         16.0,
         Color::from_rgba(180, 184, 190, 255),
     );
@@ -183,38 +173,82 @@ pub(crate) fn draw_item_detail(item: &Item, pos: Vec2) {
         draw_text(
             line,
             pos.x,
-            pos.y + 110.0 + index as f32 * 20.0,
+            pos.y + 96.0 + index as f32 * 18.0,
             18.0,
             item.rarity.color(),
         );
     }
+
+    let right_x = pos.x + width * 0.50;
     draw_text(
-        "Stats",
+        "Bonuses",
         pos.x,
-        pos.y + 148.0,
+        pos.y + 132.0,
         16.0,
         Color::from_rgba(180, 184, 190, 255),
     );
-    let stats = [
-        ("POW", item.power),
-        ("ARM", item.armor),
-        ("VIT", item.vitality),
-        ("HST", item.haste),
-    ];
-    for (index, (label, value)) in stats.iter().enumerate() {
-        draw_stat_chip(
-            label,
-            *value,
-            vec2(pos.x + index as f32 * 78.0, pos.y + 174.0),
-        );
+    let bonuses = item_bonus_labels(item);
+    if bonuses.is_empty() {
+        draw_text("No bonuses", pos.x, pos.y + 154.0, 17.0, WHITE);
+    } else {
+        for (index, bonus) in bonuses.iter().take(2).enumerate() {
+            draw_text(
+                bonus,
+                pos.x,
+                pos.y + 154.0 + index as f32 * 18.0,
+                17.0,
+                WHITE,
+            );
+        }
+        if bonuses.len() > 2 {
+            draw_text(
+                &format!("+{} more", bonuses.len() - 2),
+                pos.x,
+                pos.y + 190.0,
+                17.0,
+                WHITE,
+            );
+        }
     }
+
     draw_text(
         &format!("Value {}", item.value),
-        pos.x + 332.0,
-        pos.y + 176.0,
+        pos.x + width - 78.0,
+        pos.y + 4.0,
         18.0,
         WHITE,
     );
+
+    draw_text(
+        "If equipped",
+        right_x,
+        pos.y + 132.0,
+        16.0,
+        Color::from_rgba(180, 184, 190, 255),
+    );
+    let comparisons = item_comparison_labels(player, item);
+    if comparisons.is_empty() {
+        draw_text("No sheet changes", right_x, pos.y + 154.0, 17.0, WHITE);
+        return;
+    }
+    for (index, line) in comparisons.iter().take(3).enumerate() {
+        draw_text(
+            line,
+            right_x,
+            pos.y + 154.0 + index as f32 * 18.0,
+            17.0,
+            WHITE,
+        );
+    }
+    if comparisons.len() > 3 {
+        draw_text(
+            &format!("+{} more", comparisons.len() - 3),
+            right_x,
+            pos.y + 208.0,
+            17.0,
+            WHITE,
+        );
+    }
 }
 
 pub(crate) fn wrap_text(text: &str, max_width: f32, size: f32, max_lines: usize) -> Vec<String> {

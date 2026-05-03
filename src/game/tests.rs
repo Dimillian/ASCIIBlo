@@ -1,7 +1,10 @@
 use super::*;
 use std::collections::{HashMap, HashSet};
 
-use crate::content::{MonsterKind, MonsterRank, monster_xp, roll_item};
+use crate::{
+    content::{MonsterKind, MonsterRank, monster_xp, roll_item},
+    stat_display::item_summary,
+};
 
 fn test_monster(kind: MonsterKind, pos: Vec2) -> Monster {
     Monster {
@@ -717,7 +720,11 @@ fn pickup_feedback_stays_the_same_after_event_routing() {
         item: roll_item(&mut game.runtime.rng, 1),
         bob: 0.0,
     };
-    let expected_log = format!("Picked up {} [{}].", loot.item.name, loot.item.summary());
+    let expected_log = format!(
+        "Picked up {} [{}].",
+        loot.item.name,
+        item_summary(&loot.item)
+    );
     game.sim.loot.push(loot);
 
     game.pickup_loot();

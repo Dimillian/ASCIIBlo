@@ -2,6 +2,7 @@ mod content;
 mod game;
 mod preview;
 mod render;
+mod stat_display;
 mod ui;
 mod world;
 

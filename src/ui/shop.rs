@@ -78,7 +78,7 @@ pub(crate) fn draw(game: &Game) {
         );
     }
     if let Some(item) = items.get(game.ui.shop_cursor) {
-        draw_item_detail(item, vec2(x + 426.0, y + 170.0));
+        draw_item_detail(&game.sim.player, item, vec2(x + 426.0, y + 170.0), 292.0);
     }
     let mut hint_x = x + 24.0;
     hint_x += draw_hotkey_hint("Left/Right", "tab", vec2(hint_x, y + h - 44.0)) + 12.0;

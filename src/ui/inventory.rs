@@ -1,11 +1,10 @@
 use macroquad::prelude::*;
 
-use crate::{game::Game, render::with_alpha};
-
 use super::widgets::{
     ITEM_SELECTION, draw_hotkey_hint, draw_item_detail, draw_modal_backdrop, draw_modal_frame,
     draw_section_label, draw_stat_value,
 };
+use crate::{game::Game, render::with_alpha, stat_display::PublicStat};
 
 pub(crate) fn draw(game: &Game) {
     let w = 960.0;
@@ -128,7 +127,12 @@ pub(crate) fn draw(game: &Game) {
             216.0,
             with_alpha(Color::from_rgba(10, 12, 16, 255), 0.72),
         );
-        draw_item_detail(item, vec2(right_x + 18.0, y + 144.0));
+        draw_item_detail(
+            &game.sim.player,
+            item,
+            vec2(right_x + 18.0, y + 144.0),
+            right_w - 36.0,
+        );
     }
     draw_section_label("Equipment", vec2(right_x, y + 358.0));
     draw_rectangle(
@@ -169,12 +173,24 @@ pub(crate) fn draw(game: &Game) {
         with_alpha(Color::from_rgba(10, 12, 16, 255), 0.72),
     );
     let derived = [
-        ("STR", game.sim.player.stats.strength),
-        ("AGI", game.sim.player.stats.agility),
-        ("VIT", game.sim.player.stats.vitality),
-        ("POW", game.sim.player.power()),
-        ("ARM", game.sim.player.armor()),
-        ("HST", game.sim.player.haste()),
+        (
+            PublicStat::Strength.compact_label(),
+            game.sim.player.stats.strength,
+        ),
+        (
+            PublicStat::Agility.compact_label(),
+            game.sim.player.stats.agility,
+        ),
+        (
+            PublicStat::Vitality.compact_label(),
+            game.sim.player.stats.vitality + game.sim.player.equipment.bonus_vitality(),
+        ),
+        (PublicStat::Power.compact_label(), game.sim.player.power()),
+        (PublicStat::Armor.compact_label(), game.sim.player.armor()),
+        (
+            PublicStat::MoveSpeed.compact_label(),
+            game.sim.player.move_speed_rating().round() as i32,
+        ),
     ];
     for (index, (label, value)) in derived.iter().enumerate() {
         draw_stat_value(

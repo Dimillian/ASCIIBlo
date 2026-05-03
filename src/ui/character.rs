@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 
-use crate::{game::Game, render::with_alpha};
+use crate::{game::Game, render::with_alpha, stat_display::PublicStat};
 
 use super::widgets::{
     draw_hotkey_hint, draw_modal_backdrop, draw_modal_frame, draw_section_box, wrap_text,
@@ -36,57 +36,33 @@ pub(crate) fn draw(game: &Game) {
 
     let attribute_rows = vec![
         StatRow {
-            label: "Strength",
-            value: game.sim.player.stats.strength.to_string(),
-            detail: format!(
-                "Strength grants 2 power per point. Current base strength {} contributes {} power before gear.",
-                game.sim.player.stats.strength,
-                game.sim.player.stats.strength * 2
-            ),
+            label: PublicStat::Strength.label(),
+            value: PublicStat::Strength.value(&game.sim.player),
+            detail: PublicStat::Strength.detail(&game.sim.player),
             cursor_index: Some(0),
         },
         StatRow {
-            label: "Agility",
-            value: game.sim.player.stats.agility.to_string(),
-            detail: format!(
-                "Agility increases movement speed, shortens basic attack recovery, and raises critical hit chance. Current agility sets crit chance to {:.0}%.",
-                game.sim.player.crit_chance() * 100.0
-            ),
+            label: PublicStat::Agility.label(),
+            value: PublicStat::Agility.value(&game.sim.player),
+            detail: PublicStat::Agility.detail(&game.sim.player),
             cursor_index: Some(1),
         },
         StatRow {
-            label: "Vitality",
-            value: format!(
-                "{} (+{} gear)",
-                game.sim.player.stats.vitality,
-                game.sim.player.equipment.bonus_vitality()
-            ),
-            detail: format!(
-                "Vitality grants 7 maximum life per point and 1 armor every 2 base points. Gear adds {} vitality.",
-                game.sim.player.equipment.bonus_vitality()
-            ),
+            label: PublicStat::Vitality.label(),
+            value: PublicStat::Vitality.value(&game.sim.player),
+            detail: PublicStat::Vitality.detail(&game.sim.player),
             cursor_index: Some(2),
         },
         StatRow {
-            label: "Life",
-            value: format!(
-                "{} / {}",
-                game.sim.player.hp.round() as i32,
-                game.sim.player.max_hp().round() as i32
-            ),
-            detail: "Life is lost when monsters hit you. If it reaches 0, you wake in town and lose some gold."
-                .into(),
+            label: PublicStat::Life.label(),
+            value: PublicStat::Life.value(&game.sim.player),
+            detail: PublicStat::Life.detail(&game.sim.player),
             cursor_index: None,
         },
         StatRow {
-            label: "Mana",
-            value: format!(
-                "{} / {}",
-                game.sim.player.mana.round() as i32,
-                game.sim.player.max_mana().round() as i32
-            ),
-            detail: "Mana fuels active skills. Maximum mana rises with level, while Magic mastery improves regeneration."
-                .into(),
+            label: PublicStat::Mana.label(),
+            value: PublicStat::Mana.value(&game.sim.player),
+            detail: PublicStat::Mana.detail(&game.sim.player),
             cursor_index: None,
         },
         StatRow {
@@ -99,61 +75,41 @@ pub(crate) fn draw(game: &Game) {
 
     let combat_rows = vec![
         StatRow {
-            label: "Power",
-            value: game.sim.player.power().to_string(),
-            detail: format!(
-                "Power is your weapon baseline. It equals strength x2 plus {} gear power before attack rolls.",
-                game.sim.player.equipment.bonus_power()
-            ),
+            label: PublicStat::Power.label(),
+            value: PublicStat::Power.value(&game.sim.player),
+            detail: PublicStat::Power.detail(&game.sim.player),
             cursor_index: None,
         },
         StatRow {
-            label: "Armor",
-            value: game.sim.player.armor().to_string(),
-            detail: format!(
-                "Armor subtracts from incoming monster damage, but hits still deal at least 1. Current value includes {} gear armor.",
-                game.sim.player.equipment.bonus_armor()
-            ),
+            label: PublicStat::Armor.label(),
+            value: PublicStat::Armor.value(&game.sim.player),
+            detail: PublicStat::Armor.detail(&game.sim.player),
             cursor_index: None,
         },
         StatRow {
-            label: "Haste",
-            value: game.sim.player.haste().to_string(),
-            detail: format!(
-                "Increases movement speed and shortens basic attack recovery. Current value includes {} from gear.",
-                game.sim.player.equipment.bonus_haste()
-            ),
+            label: PublicStat::CritChance.label(),
+            value: PublicStat::CritChance.value(&game.sim.player),
+            detail: PublicStat::CritChance.detail(&game.sim.player),
             cursor_index: None,
         },
         StatRow {
-            label: "Crit chance",
-            value: format!("{:.0}%", game.sim.player.crit_chance() * 100.0),
-            detail: "Critical chance starts at 8%, gains 1% per agility, and caps at 35%. Critical hits deal double damage."
-                .into(),
+            label: PublicStat::AttackDelay.label(),
+            value: PublicStat::AttackDelay.value(&game.sim.player),
+            detail: PublicStat::AttackDelay.detail(&game.sim.player),
             cursor_index: None,
         },
         StatRow {
-            label: "Attack delay",
-            value: format!("{:.2}s", game.sim.player.attack_interval()),
-            detail:
-                "Basic attacks recover faster with haste. The interval cannot go below 0.16 seconds."
-                    .into(),
-            cursor_index: None,
-        },
-        StatRow {
-            label: "Move speed",
-            value: format!("{:.0}", game.sim.player.move_speed_rating()),
-            detail:
-                "Movement speed starts at 100 and increases with Agility and certain gear bonuses."
-                    .into(),
+            label: PublicStat::MoveSpeed.label(),
+            value: PublicStat::MoveSpeed.value(&game.sim.player),
+            detail: PublicStat::MoveSpeed.detail(&game.sim.player),
             cursor_index: None,
         },
     ];
 
     let progression_rows = vec![StatRow {
-        label: "Stat points",
-        value: game.sim.player.stats.unspent_stat_points.to_string(),
-        detail: "Spend stat points on Strength, Agility, or Vitality with Enter.".into(),
+        label: PublicStat::StatPoints.label(),
+        value: PublicStat::StatPoints.value(&game.sim.player),
+        detail: PublicStat::StatPoints.detail(&game.sim.player),
         cursor_index: None,
     }];
 

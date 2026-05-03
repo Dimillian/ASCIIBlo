@@ -3,6 +3,7 @@ use macroquad::prelude::*;
 use crate::{
     game::{AbilityKind, Game},
     render::with_alpha,
+    stat_display::{PublicStat, item_summary},
     world::World,
 };
 
@@ -125,12 +126,15 @@ pub(crate) fn draw(game: &Game) {
     draw_hotkey_hint("M", "map", vec2(bottom_x, bar_y + 17.0));
     draw_text(
         &format!(
-            "POW {}  ARM {}  HST {}",
+            "{} {}  {} {}  {} {}",
+            PublicStat::Power.compact_label(),
             game.sim.player.power(),
+            PublicStat::Armor.compact_label(),
             game.sim.player.armor(),
-            game.sim.player.haste()
+            PublicStat::MoveSpeed.compact_label(),
+            game.sim.player.move_speed_rating().round() as i32
         ),
-        screen_width() - 238.0,
+        screen_width() - 254.0,
         bar_y + 35.0,
         18.0,
         WHITE,
@@ -487,7 +491,7 @@ fn draw_nearest_loot_tooltip(game: &Game) {
         return;
     };
     let name_lines = wrap_text(&loot.item.name, 310.0, 20.0, 2);
-    let summary = loot.item.summary();
+    let summary = item_summary(&loot.item);
     let content_h = name_lines.len() as f32 * 22.0 + if summary.is_empty() { 0.0 } else { 22.0 };
     let w = 390.0;
     let h = 54.0 + content_h;

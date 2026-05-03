@@ -3,6 +3,7 @@ use macroquad::prelude::*;
 use crate::{
     game::{AbilityKind, DisciplineKind, Game, SkillBookFocus, abilities_for_discipline},
     render::with_alpha,
+    stat_display::PublicStat,
 };
 
 use super::widgets::{
@@ -417,21 +418,26 @@ fn draw_badge(text: &str, x: f32, y: f32, color: Color) {
 fn current_bonus(game: &Game, kind: DisciplineKind) -> String {
     match kind {
         DisciplineKind::Melee => format!(
-            "+{} physical damage on basic attacks and melee skills.",
-            game.sim.player.melee_damage_bonus()
+            "{} {} on basic attacks and melee skills.",
+            PublicStat::MeleeDamage.value(&game.sim.player),
+            PublicStat::MeleeDamage.label()
         ),
         DisciplineKind::Magic => format!(
-            "+{} spell damage. +{:.1} mana/sec regeneration.",
-            game.sim.player.magic_damage_bonus(),
-            game.sim.player.magic_regen_bonus()
+            "{} {}. {} {}.",
+            PublicStat::SpellDamage.value(&game.sim.player),
+            PublicStat::SpellDamage.label(),
+            PublicStat::ManaRegen.value(&game.sim.player),
+            PublicStat::ManaRegen.label()
         ),
         DisciplineKind::Armor => format!(
-            "+{} effective armor from mastery.",
-            game.sim.player.armor_mastery_bonus()
+            "+{} {} from mastery.",
+            game.sim.player.armor_mastery_bonus(),
+            PublicStat::Armor.label()
         ),
         DisciplineKind::Agility => format!(
-            "+{} movement speed from mastery.",
-            game.sim.player.agility_mastery_bonus()
+            "+{} {} from mastery.",
+            game.sim.player.agility_mastery_bonus(),
+            PublicStat::MoveSpeed.label()
         ),
     }
 }
@@ -474,8 +480,12 @@ fn discipline_next_label(kind: DisciplineKind, level: i32) -> String {
 
 fn passive_bonus_at_level(kind: DisciplineKind, level: i32) -> String {
     match kind {
-        DisciplineKind::Armor => format!("+{} armor", (level - 1).max(0)),
-        DisciplineKind::Agility => format!("+{} speed", (level - 1).max(0) * 6),
+        DisciplineKind::Armor => format!("+{} {}", (level - 1).max(0), PublicStat::Armor.label()),
+        DisciplineKind::Agility => format!(
+            "+{} {}",
+            (level - 1).max(0) * 6,
+            PublicStat::MoveSpeed.label()
+        ),
         _ => String::new(),
     }
 }

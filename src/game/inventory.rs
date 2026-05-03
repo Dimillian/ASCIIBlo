@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 
-use crate::content::Slot;
+use crate::{content::Slot, stat_display::item_summary};
 
 use super::{Game, Loot, events::GameplayEvent};
 
@@ -24,7 +24,7 @@ impl Game {
             pos: self.sim.player.pos,
             color: loot.item.rarity.color(),
             name: loot.item.name.clone(),
-            summary: loot.item.summary(),
+            summary: item_summary(&loot.item),
         });
         self.sim.player.inventory.push(loot.item);
     }

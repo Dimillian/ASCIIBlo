@@ -63,25 +63,6 @@ pub struct Item {
     pub value: i32,
 }
 
-impl Item {
-    pub fn summary(&self) -> String {
-        let mut parts = Vec::new();
-        if self.power != 0 {
-            parts.push(format!("+{} POW", self.power));
-        }
-        if self.armor != 0 {
-            parts.push(format!("+{} ARM", self.armor));
-        }
-        if self.vitality != 0 {
-            parts.push(format!("+{} VIT", self.vitality));
-        }
-        if self.haste != 0 {
-            parts.push(format!("+{} HST", self.haste));
-        }
-        parts.join(" ")
-    }
-}
-
 #[derive(Clone, Copy)]
 struct BaseItem {
     name: &'static str,
