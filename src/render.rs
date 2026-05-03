@@ -40,10 +40,10 @@ impl Renderer {
 
     pub fn draw(&mut self, game: &Game) {
         clear_background(Color::from_rgba(10, 12, 16, 255));
-        let shake = if game.screen_shake > 0.0 {
+        let shake = if game.fx.screen_shake > 0.0 {
             vec2(
-                (game.elapsed * 73.0).sin() * game.screen_shake,
-                (game.elapsed * 91.0).cos() * game.screen_shake,
+                (game.runtime.elapsed * 73.0).sin() * game.fx.screen_shake,
+                (game.runtime.elapsed * 91.0).cos() * game.fx.screen_shake,
             )
         } else {
             Vec2::ZERO
@@ -56,7 +56,7 @@ impl Renderer {
         self.draw_player(game, camera);
         self.draw_effects(game, camera);
         ui::draw_hud(game);
-        match game.ui_mode {
+        match game.ui.mode {
             UiMode::Inventory => ui::draw_inventory(game),
             UiMode::Character => ui::draw_character(game),
             UiMode::SkillBook => ui::draw_skill_book(game),
@@ -71,7 +71,7 @@ impl Renderer {
     fn draw_world(&mut self, game: &Game, camera: Vec2) {
         let view_min = World::world_to_tile(camera - screen_center() - vec2(TILE, TILE));
         let view_max = World::world_to_tile(camera + screen_center() + vec2(TILE, TILE));
-        let shimmer_tick = game.elapsed as u64;
+        let shimmer_tick = game.runtime.elapsed as u64;
         let lights = collect_lights(game);
         for y in view_min.y..=view_max.y {
             for x in view_min.x..=view_max.x {
@@ -100,7 +100,13 @@ impl Renderer {
                 );
                 self.draw_biome_edge(game, tile_pos, screen, biome);
                 if !should_draw_tile_glyph(cached, tile_pos, game.world.seed) {
-                    self.draw_tile_accent(cached, tile_pos, screen, game.world.seed, game.elapsed);
+                    self.draw_tile_accent(
+                        cached,
+                        tile_pos,
+                        screen,
+                        game.world.seed,
+                        game.runtime.elapsed,
+                    );
                     continue;
                 }
                 let shimmer = cached.shimmer_seed + shimmer_tick;
@@ -110,7 +116,13 @@ impl Renderer {
                     18.0,
                     with_alpha(apply_light(cached.fg, light.scale(0.7)), 0.72),
                 );
-                self.draw_tile_accent(cached, tile_pos, screen, game.world.seed, game.elapsed);
+                self.draw_tile_accent(
+                    cached,
+                    tile_pos,
+                    screen,
+                    game.world.seed,
+                    game.runtime.elapsed,
+                );
             }
         }
     }
@@ -270,7 +282,7 @@ impl Renderer {
     }
 
     fn draw_loot(&self, game: &Game, camera: Vec2) {
-        for loot in &game.loot {
+        for loot in &game.sim.loot {
             let screen = world_to_screen(loot.pos, camera) + vec2(0.0, loot.bob.sin() * 4.0);
             draw_glow(screen, 8.0, loot.item.rarity.color(), 0.8);
             draw_text_centered("*", screen, 24.0, loot.item.rarity.color());
@@ -278,7 +290,7 @@ impl Renderer {
     }
 
     fn draw_monsters(&self, game: &Game, camera: Vec2) {
-        for monster in &game.monsters {
+        for monster in &game.sim.monsters {
             self.draw_monster(monster, camera);
         }
     }
@@ -428,7 +440,7 @@ impl Renderer {
     }
 
     fn draw_npcs(&self, game: &Game, camera: Vec2) {
-        for npc in &game.npcs {
+        for npc in &game.sim.npcs {
             let screen = world_to_screen(npc.pos, camera);
             draw_circle(screen.x, screen.y + 6.0, 10.0, with_alpha(BLACK, 0.28));
             draw_circle(screen.x, screen.y, 14.0, with_alpha(npc.kind.color(), 0.16));
@@ -438,18 +450,18 @@ impl Renderer {
                 26.0,
                 npc.kind.color(),
             );
-            if npc.pos.distance(game.player.pos) <= 42.0 && game.ui_mode == UiMode::None {
+            if npc.pos.distance(game.sim.player.pos) <= 42.0 && game.ui.mode == UiMode::None {
                 ui::draw_world_hotkey_hint("F", "talk", screen + vec2(-24.0, -40.0));
             }
         }
     }
 
     fn draw_player(&self, game: &Game, camera: Vec2) {
-        let screen = world_to_screen(game.player.pos, camera);
+        let screen = world_to_screen(game.sim.player.pos, camera);
         draw_circle(screen.x, screen.y + 7.0, 12.0, with_alpha(BLACK, 0.32));
         draw_circle(screen.x, screen.y, 18.0, with_alpha(WHITE, 0.08));
         draw_text_centered("@", screen, 30.0, WHITE);
-        let aim = screen + game.player.facing * 28.0;
+        let aim = screen + game.sim.player.facing * 28.0;
         draw_line(
             screen.x,
             screen.y,
@@ -461,7 +473,7 @@ impl Renderer {
     }
 
     fn draw_effects(&self, game: &Game, camera: Vec2) {
-        for meteor in &game.meteors {
+        for meteor in &game.fx.meteors {
             let screen = world_to_screen(meteor.pos, camera);
             let ratio = (meteor.ttl / 0.72).clamp(0.0, 1.0);
             draw_glow(
@@ -484,7 +496,7 @@ impl Renderer {
                 with_alpha(Color::from_rgba(255, 132, 64, 255), 0.18),
             );
         }
-        for projectile in &game.projectiles {
+        for projectile in &game.fx.projectiles {
             let screen = world_to_screen(projectile.pos, camera);
             let direction = projectile.vel.normalize_or_zero();
             for (index, scale) in [0.72, 0.46, 0.22].into_iter().enumerate() {
@@ -499,7 +511,7 @@ impl Renderer {
             draw_glow(screen, projectile.radius + 4.0, projectile.color, 1.0);
             draw_circle(screen.x, screen.y, projectile.radius, projectile.color);
         }
-        for pulse in &game.pulses {
+        for pulse in &game.fx.pulses {
             let screen = world_to_screen(pulse.pos, camera);
             draw_glow(
                 screen,
@@ -515,7 +527,7 @@ impl Renderer {
                 with_alpha(pulse.color, (pulse.ttl * 1.5).clamp(0.0, 1.0)),
             );
         }
-        for slash in &game.slash_arcs {
+        for slash in &game.fx.slash_arcs {
             let center = world_to_screen(slash.pos, camera);
             let base = slash.direction.y.atan2(slash.direction.x);
             let start = base - std::f32::consts::FRAC_PI_2;
@@ -535,7 +547,7 @@ impl Renderer {
                 );
             }
         }
-        for particle in &game.particles {
+        for particle in &game.fx.particles {
             let screen = world_to_screen(particle.pos, camera);
             draw_circle(
                 screen.x,
@@ -544,7 +556,7 @@ impl Renderer {
                 with_alpha(particle.color, (particle.ttl * 2.0).clamp(0.0, 1.0)),
             );
         }
-        for text in &game.floating {
+        for text in &game.fx.floating {
             let screen = world_to_screen(text.pos, camera);
             draw_text_centered(
                 &text.text,
@@ -608,12 +620,12 @@ const MAX_LIGHT_CHANNEL: f32 = 0.34;
 
 fn collect_lights(game: &Game) -> Vec<SceneLight> {
     let mut lights = vec![SceneLight {
-        pos: game.player.pos,
+        pos: game.sim.player.pos,
         radius: TILE * 8.0,
         intensity: 0.16,
         color: Color::from_rgba(255, 238, 214, 255),
     }];
-    for projectile in &game.projectiles {
+    for projectile in &game.fx.projectiles {
         lights.push(SceneLight {
             pos: projectile.pos,
             radius: TILE * 4.0,
@@ -621,7 +633,7 @@ fn collect_lights(game: &Game) -> Vec<SceneLight> {
             color: projectile.color,
         });
     }
-    for loot in &game.loot {
+    for loot in &game.sim.loot {
         lights.push(SceneLight {
             pos: loot.pos,
             radius: TILE * 2.5,
@@ -629,7 +641,7 @@ fn collect_lights(game: &Game) -> Vec<SceneLight> {
             color: loot.item.rarity.color(),
         });
     }
-    for pulse in &game.pulses {
+    for pulse in &game.fx.pulses {
         lights.push(SceneLight {
             pos: pulse.pos,
             radius: pulse.radius.max(TILE * 2.5),
@@ -637,7 +649,7 @@ fn collect_lights(game: &Game) -> Vec<SceneLight> {
             color: pulse.color,
         });
     }
-    for meteor in &game.meteors {
+    for meteor in &game.fx.meteors {
         let ratio = (meteor.ttl / 0.72).clamp(0.0, 1.0);
         lights.push(SceneLight {
             pos: meteor.pos,

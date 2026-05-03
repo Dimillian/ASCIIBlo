@@ -40,13 +40,16 @@ impl Game {
                 continue;
             };
             let biome = self.world.biome_at_world(pack_center);
-            let kind = roll_monster(&mut self.rng, biome);
-            let level =
-                scaled_monster_level(self.world.biome_level(pack_center), self.player.stats.level);
-            let pack_size = PACK_SIZE_WEIGHTS[self.rng.random_range(0..PACK_SIZE_WEIGHTS.len())];
-            let rare_index = self.rng.random_range(0..pack_size);
+            let kind = roll_monster(&mut self.runtime.rng, biome);
+            let level = scaled_monster_level(
+                self.world.biome_level(pack_center),
+                self.sim.player.stats.level,
+            );
+            let pack_size =
+                PACK_SIZE_WEIGHTS[self.runtime.rng.random_range(0..PACK_SIZE_WEIGHTS.len())];
+            let rare_index = self.runtime.rng.random_range(0..pack_size);
             let rare_rank = self.roll_pack_rank();
-            let pack_id = self.next_monster_pack_id;
+            let pack_id = self.runtime.next_monster_pack_id;
             let mut pack = Vec::with_capacity(pack_size);
 
             for member_index in 0..pack_size {
@@ -71,16 +74,16 @@ impl Game {
                     hp: max_hp,
                     max_hp,
                     level,
-                    attack_cd: self.rng.random_range(0.0..kind.attack_cooldown()),
-                    wobble: self.rng.random_range(0.0..10.0),
+                    attack_cd: self.runtime.rng.random_range(0.0..kind.attack_cooldown()),
+                    wobble: self.runtime.rng.random_range(0.0..10.0),
                     hit_flash: 0.0,
                     chill_ttl: 0.0,
                 });
             }
 
             if pack.len() == pack_size {
-                self.next_monster_pack_id += 1;
-                self.monsters.extend(pack);
+                self.runtime.next_monster_pack_id += 1;
+                self.sim.monsters.extend(pack);
                 return true;
             }
         }
@@ -88,28 +91,29 @@ impl Game {
     }
 
     fn find_pack_center(&mut self) -> Option<Vec2> {
-        let player_tile = World::world_to_tile(self.player.pos);
+        let player_tile = World::world_to_tile(self.sim.player.pos);
         for _ in 0..128 {
             let tile = player_tile
                 + ivec2(
-                    self.rng.random_range(
+                    self.runtime.rng.random_range(
                         -MONSTER_SPAWN_MAX_RADIUS_TILES..=MONSTER_SPAWN_MAX_RADIUS_TILES,
                     ),
-                    self.rng.random_range(
+                    self.runtime.rng.random_range(
                         -MONSTER_SPAWN_MAX_RADIUS_TILES..=MONSTER_SPAWN_MAX_RADIUS_TILES,
                     ),
                 );
             let pos = World::tile_center(tile);
             if !self.world.tile(tile).walkable
                 || self.world.is_safe_zone(tile)
-                || pos.distance(self.player.pos) < MONSTER_SPAWN_MIN_RADIUS
-                || pos.distance(self.player.pos) > MONSTER_LOCAL_RADIUS
+                || pos.distance(self.sim.player.pos) < MONSTER_SPAWN_MIN_RADIUS
+                || pos.distance(self.sim.player.pos) > MONSTER_LOCAL_RADIUS
                 || pack_center_can_be_seen_with_view(
                     pos,
-                    self.player.pos,
-                    self.spawn_visibility_half_view,
+                    self.sim.player.pos,
+                    self.runtime.spawn_visibility_half_view,
                 )
                 || self
+                    .sim
                     .monsters
                     .iter()
                     .any(|monster| monster.pack_center.distance(pos) < MONSTER_PACK_SEPARATION)
@@ -123,8 +127,9 @@ impl Game {
 
     fn find_pack_member_pos(&mut self, pack_center: Vec2, pack: &[super::Monster]) -> Option<Vec2> {
         for _ in 0..96 {
-            let angle = self.rng.random_range(0.0..std::f32::consts::TAU);
+            let angle = self.runtime.rng.random_range(0.0..std::f32::consts::TAU);
             let radius = self
+                .runtime
                 .rng
                 .random_range(MONSTER_PACK_MEMBER_MIN_DISTANCE..=MONSTER_PACK_MEMBER_MAX_DISTANCE);
             let pos = pack_center + vec2(angle.cos(), angle.sin()) * radius;
@@ -132,6 +137,7 @@ impl Game {
             if !self.world.tile(tile).walkable
                 || self.world.is_safe_zone(tile)
                 || self
+                    .sim
                     .monsters
                     .iter()
                     .any(|monster| monster.pos.distance(pos) < 18.0)
@@ -145,20 +151,23 @@ impl Game {
     }
 
     fn roll_pack_rank(&mut self) -> MonsterRank {
-        monster_pack_rank_for_roll(self.rng.random_range(0..100))
+        monster_pack_rank_for_roll(self.runtime.rng.random_range(0..100))
     }
 
     pub(super) fn cull_distant_monsters(&mut self) {
-        self.monsters.retain(|monster| {
-            monster.pack_center.distance(self.player.pos) <= MONSTER_DESPAWN_RADIUS
+        self.sim.monsters.retain(|monster| {
+            monster.pack_center.distance(self.sim.player.pos) <= MONSTER_DESPAWN_RADIUS
         });
     }
 
     pub(super) fn replenish_local_monsters(&mut self) {
         let nearby_pack_ids: HashSet<u64> = self
+            .sim
             .monsters
             .iter()
-            .filter(|monster| monster.pack_center.distance(self.player.pos) <= MONSTER_LOCAL_RADIUS)
+            .filter(|monster| {
+                monster.pack_center.distance(self.sim.player.pos) <= MONSTER_LOCAL_RADIUS
+            })
             .map(|monster| monster.pack_id)
             .collect();
         if nearby_pack_ids.len() < MONSTER_LOCAL_PACK_REFILL_THRESHOLD {

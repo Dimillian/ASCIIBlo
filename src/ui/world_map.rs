@@ -17,10 +17,10 @@ pub(crate) fn draw(game: &Game) {
     draw_text(
         &format!(
             "Known tiles {}   Center ({}, {})   Zoom {:.1}x",
-            game.known_tiles.len(),
-            game.world_map.center_tile.x.round() as i32,
-            game.world_map.center_tile.y.round() as i32,
-            game.world_map.zoom
+            game.sim.known_tiles.len(),
+            game.ui.world_map.center_tile.x.round() as i32,
+            game.ui.world_map.center_tile.y.round() as i32,
+            game.ui.world_map.zoom
         ),
         frame.x + 24.0,
         frame.y + 66.0,
@@ -55,8 +55,8 @@ fn draw_map_panel(game: &Game, rect: Rect) {
         with_alpha(Color::from_rgba(255, 224, 96, 255), 0.72),
     );
 
-    let zoom = game.world_map.zoom;
-    let center = game.world_map.center_tile;
+    let zoom = game.ui.world_map.zoom;
+    let center = game.ui.world_map.center_tile;
     let half_w = rect.w * 0.5 / zoom;
     let half_h = rect.h * 0.5 / zoom;
     let min_x = (center.x - half_w).floor() as i32 - 1;
@@ -66,7 +66,7 @@ fn draw_map_panel(game: &Game, rect: Rect) {
 
     draw_grid(rect, center, zoom, min_x, max_x, min_y, max_y);
 
-    for tile in &game.known_tiles {
+    for tile in &game.sim.known_tiles {
         if tile.x < min_x || tile.x > max_x || tile.y < min_y || tile.y > max_y {
             continue;
         }
@@ -81,9 +81,9 @@ fn draw_map_panel(game: &Game, rect: Rect) {
         );
     }
 
-    for settlement in &game.discovered_settlements {
+    for settlement in &game.sim.discovered_settlements {
         let destination = settlement.site;
-        if !game.known_tiles.contains(&destination.center) {
+        if !game.sim.known_tiles.contains(&destination.center) {
             continue;
         }
         let screen = tile_to_screen(destination.center, rect, center, zoom);
@@ -101,7 +101,7 @@ fn draw_map_panel(game: &Game, rect: Rect) {
         }
     }
 
-    let player_tile = World::world_to_tile(game.player.pos);
+    let player_tile = World::world_to_tile(game.sim.player.pos);
     let player_screen = tile_to_screen(player_tile, rect, center, zoom);
     if rect.contains(player_screen) {
         draw_circle(

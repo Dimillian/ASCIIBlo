@@ -74,44 +74,44 @@ impl PreviewMode {
     }
 
     pub fn configure(self, game: &mut Game) {
-        game.player.stats.gold = 128;
-        game.shop_cursor = 0;
-        game.travel_cursor = 0;
-        game.inventory_cursor = 0;
-        game.character_cursor = 0;
-        game.skill_book_cursor = 0;
-        game.skill_book_ability_cursor = 0;
-        game.skill_book_focus = SkillBookFocus::Disciplines;
-        game.player.stats.unspent_stat_points = 0;
+        game.sim.player.stats.gold = 128;
+        game.ui.shop_cursor = 0;
+        game.ui.travel_cursor = 0;
+        game.ui.inventory_cursor = 0;
+        game.ui.character_cursor = 0;
+        game.ui.skill_book_cursor = 0;
+        game.ui.skill_book_ability_cursor = 0;
+        game.ui.skill_book_focus = SkillBookFocus::Disciplines;
+        game.sim.player.stats.unspent_stat_points = 0;
         for kind in DisciplineKind::ALL {
-            let progress = game.player.disciplines.get_mut(kind);
+            let progress = game.sim.player.disciplines.get_mut(kind);
             progress.level = 1;
             progress.xp = 0;
             progress.next_xp = 24;
         }
-        game.ui_mode = UiMode::None;
-        game.shop_tab = ShopTab::Buy;
-        game.loot.clear();
-        game.floating.clear();
-        game.particles.clear();
-        game.pulses.clear();
-        game.slash_arcs.clear();
-        game.projectiles.clear();
-        game.meteors.clear();
-        game.skill_xp_toasts.clear();
-        game.notifications.clear();
-        game.player.hp = game.player.max_hp();
-        game.player.mana = game.player.max_mana();
-        game.player.attack_cd = 0.0;
-        game.player.ability_cooldowns = [0.0; 8];
-        game.player.bound_abilities = [AbilityKind::Cleave, AbilityKind::Fireball];
-        game.log = vec!["The bell in Ember Town rings. Go make trouble.".into()];
-        game.preview_hover_screen = Some(Vec2::new(-1_000.0, -1_000.0));
+        game.ui.mode = UiMode::None;
+        game.ui.shop_tab = ShopTab::Buy;
+        game.sim.loot.clear();
+        game.fx.floating.clear();
+        game.fx.particles.clear();
+        game.fx.pulses.clear();
+        game.fx.slash_arcs.clear();
+        game.fx.projectiles.clear();
+        game.fx.meteors.clear();
+        game.fx.skill_xp_toasts.clear();
+        game.fx.notifications.clear();
+        game.sim.player.hp = game.sim.player.max_hp();
+        game.sim.player.mana = game.sim.player.max_mana();
+        game.sim.player.attack_cd = 0.0;
+        game.sim.player.ability_cooldowns = [0.0; 8];
+        game.sim.player.bound_abilities = [AbilityKind::Cleave, AbilityKind::Fireball];
+        game.fx.log = vec!["The bell in Ember Town rings. Go make trouble.".into()];
+        game.runtime.preview_hover_screen = Some(Vec2::new(-1_000.0, -1_000.0));
 
         match self {
             PreviewMode::Gameplay => {
-                game.player.ability_cooldowns[AbilityKind::Cleave.index()] = 1.3;
-                game.log = vec![
+                game.sim.player.ability_cooldowns[AbilityKind::Cleave.index()] = 1.3;
+                game.fx.log = vec![
                     "The bell in Ember Town rings. Go make trouble.".into(),
                     "You hit Slime for 14.".into(),
                     "You hit Slime for 15.".into(),
@@ -121,28 +121,28 @@ impl PreviewMode {
                     "Slime drops Swift Mace of Alacrity.".into(),
                     "Nothing close enough to pocket.".into(),
                 ];
-                game.skill_xp_toasts.push(SkillXpToast {
+                game.fx.skill_xp_toasts.push(SkillXpToast {
                     kind: DisciplineKind::Melee,
                     amount: 6,
                     ttl: 2.4,
                 });
-                game.notifications.push(Notification {
+                game.fx.notifications.push(Notification {
                     text: "Melee reaches level 2".into(),
                     color: DisciplineKind::Melee.color(),
                     ttl: 2.2,
                 });
-                game.notifications.push(Notification {
+                game.fx.notifications.push(Notification {
                     text: "Unlocked Rush".into(),
                     color: DisciplineKind::Melee.color(),
                     ttl: 2.6,
                 });
-                game.monsters.clear();
-                game.monsters.push(Monster {
+                game.sim.monsters.clear();
+                game.sim.monsters.push(Monster {
                     kind: crate::content::MonsterKind::Brute,
                     rank: crate::content::MonsterRank::Elite,
                     pack_id: 0,
-                    pack_center: game.player.pos + Vec2::new(42.0, 0.0),
-                    pos: game.player.pos + Vec2::new(42.0, 0.0),
+                    pack_center: game.sim.player.pos + Vec2::new(42.0, 0.0),
+                    pos: game.sim.player.pos + Vec2::new(42.0, 0.0),
                     vel: Vec2::ZERO,
                     hit_offset: Vec2::ZERO,
                     hp: 41.0,
@@ -153,13 +153,13 @@ impl PreviewMode {
                     hit_flash: 0.0,
                     chill_ttl: 0.0,
                 });
-                game.preview_hover_world = Some(game.player.pos + Vec2::new(42.0, 0.0));
+                game.runtime.preview_hover_world = Some(game.sim.player.pos + Vec2::new(42.0, 0.0));
             }
             PreviewMode::Lighting => {
-                game.monsters.clear();
-                game.projectiles.push(Projectile {
+                game.sim.monsters.clear();
+                game.fx.projectiles.push(Projectile {
                     ability: AbilityKind::Fireball,
-                    pos: game.player.pos + Vec2::new(76.0, -18.0),
+                    pos: game.sim.player.pos + Vec2::new(76.0, -18.0),
                     vel: Vec2::new(160.0, 0.0),
                     ttl: 0.95,
                     radius: 7.0,
@@ -167,14 +167,14 @@ impl PreviewMode {
                     aoe_radius: 34.0,
                     color: Color::from_rgba(255, 132, 64, 255),
                 });
-                game.pulses.push(Pulse {
-                    pos: game.player.pos + Vec2::new(-72.0, 18.0),
+                game.fx.pulses.push(Pulse {
+                    pos: game.sim.player.pos + Vec2::new(-72.0, 18.0),
                     radius: 18.0,
                     ttl: 0.42,
                     color: Color::from_rgba(128, 214, 255, 255),
                 });
-                game.loot.push(Loot {
-                    pos: game.player.pos + Vec2::new(-118.0, -16.0),
+                game.sim.loot.push(Loot {
+                    pos: game.sim.player.pos + Vec2::new(-118.0, -16.0),
                     item: Item {
                         name: "Frostglass Charm".into(),
                         base_name: "Charm".into(),
@@ -190,11 +190,11 @@ impl PreviewMode {
                     },
                     bob: 0.0,
                 });
-                game.log = vec!["Warm and cool light cross the town square.".into()];
+                game.fx.log = vec!["Warm and cool light cross the town square.".into()];
             }
             PreviewMode::Pickup => {
-                game.loot.push(Loot {
-                    pos: game.player.pos + Vec2::new(18.0, 0.0),
+                game.sim.loot.push(Loot {
+                    pos: game.sim.player.pos + Vec2::new(18.0, 0.0),
                     item: Item {
                         name: "Swift Dirk of the Fox".into(),
                         base_name: "Dirk".into(),
@@ -211,24 +211,24 @@ impl PreviewMode {
                     bob: 0.0,
                 });
             }
-            PreviewMode::Inventory => game.ui_mode = UiMode::Inventory,
+            PreviewMode::Inventory => game.ui.mode = UiMode::Inventory,
             PreviewMode::Character => {
-                game.player.stats.unspent_stat_points = 3;
-                game.ui_mode = UiMode::Character;
+                game.sim.player.stats.unspent_stat_points = 3;
+                game.ui.mode = UiMode::Character;
             }
             PreviewMode::SkillBook => {
-                game.player.disciplines.melee.xp = 18;
-                game.player.disciplines.magic.level = 8;
-                game.player.disciplines.magic.xp = 12;
-                game.player.disciplines.magic.next_xp = 808;
-                game.player.bound_abilities = [AbilityKind::Fireball, AbilityKind::Meteor];
-                game.skill_book_cursor = 1;
-                game.skill_book_ability_cursor = 2;
-                game.skill_book_focus = SkillBookFocus::Skills;
-                game.ui_mode = UiMode::SkillBook;
+                game.sim.player.disciplines.melee.xp = 18;
+                game.sim.player.disciplines.magic.level = 8;
+                game.sim.player.disciplines.magic.xp = 12;
+                game.sim.player.disciplines.magic.next_xp = 808;
+                game.sim.player.bound_abilities = [AbilityKind::Fireball, AbilityKind::Meteor];
+                game.ui.skill_book_cursor = 1;
+                game.ui.skill_book_ability_cursor = 2;
+                game.ui.skill_book_focus = SkillBookFocus::Skills;
+                game.ui.mode = UiMode::SkillBook;
             }
             PreviewMode::WorldMap => {
-                game.ui_mode = UiMode::WorldMap;
+                game.ui.mode = UiMode::WorldMap;
                 for center in [
                     ivec2(0, 0),
                     ivec2(0, -8),
@@ -250,15 +250,15 @@ impl PreviewMode {
                 }
                 reveal_preview_towns(game, 4);
             }
-            PreviewMode::ShopBuy => game.ui_mode = UiMode::Merchant,
+            PreviewMode::ShopBuy => game.ui.mode = UiMode::Merchant,
             PreviewMode::ShopSell => {
-                game.ui_mode = UiMode::Merchant;
-                game.shop_tab = ShopTab::Sell;
+                game.ui.mode = UiMode::Merchant;
+                game.ui.shop_tab = ShopTab::Sell;
             }
-            PreviewMode::Trainer => game.ui_mode = UiMode::Trainer,
+            PreviewMode::Trainer => game.ui.mode = UiMode::Trainer,
             PreviewMode::Travel => {
                 reveal_preview_towns(game, 5);
-                game.ui_mode = UiMode::Travel;
+                game.ui.mode = UiMode::Travel;
             }
         }
     }
@@ -271,7 +271,7 @@ fn reveal_preview_towns(game: &mut Game, count: usize) {
         .filter(|site| site.tier == crate::world::SettlementTier::Town)
     {
         game.reveal_around_tile(site.center, 2);
-        if game.travel_destinations.len() >= count {
+        if game.sim.travel_destinations.len() >= count {
             break;
         }
     }
@@ -390,26 +390,26 @@ mod tests {
     fn configures_each_preview_mode() {
         let mut game = Game::new(4);
         PreviewMode::ShopSell.configure(&mut game);
-        assert_eq!(game.ui_mode, UiMode::Merchant);
-        assert_eq!(game.shop_tab, ShopTab::Sell);
+        assert_eq!(game.ui.mode, UiMode::Merchant);
+        assert_eq!(game.ui.shop_tab, ShopTab::Sell);
 
         PreviewMode::WorldMap.configure(&mut game);
-        assert_eq!(game.ui_mode, UiMode::WorldMap);
-        assert!(game.known_tiles.len() > 600);
+        assert_eq!(game.ui.mode, UiMode::WorldMap);
+        assert!(game.sim.known_tiles.len() > 600);
 
         PreviewMode::SkillBook.configure(&mut game);
-        assert_eq!(game.ui_mode, UiMode::SkillBook);
-        assert_eq!(game.skill_book_cursor, 1);
-        assert_eq!(game.skill_book_focus, SkillBookFocus::Skills);
+        assert_eq!(game.ui.mode, UiMode::SkillBook);
+        assert_eq!(game.ui.skill_book_cursor, 1);
+        assert_eq!(game.ui.skill_book_focus, SkillBookFocus::Skills);
 
         PreviewMode::Lighting.configure(&mut game);
-        assert_eq!(game.projectiles.len(), 1);
-        assert_eq!(game.pulses.len(), 1);
-        assert_eq!(game.loot.len(), 1);
+        assert_eq!(game.fx.projectiles.len(), 1);
+        assert_eq!(game.fx.pulses.len(), 1);
+        assert_eq!(game.sim.loot.len(), 1);
 
         PreviewMode::Travel.configure(&mut game);
-        assert_eq!(game.ui_mode, UiMode::Travel);
-        assert_eq!(game.shop_tab, ShopTab::Buy);
+        assert_eq!(game.ui.mode, UiMode::Travel);
+        assert_eq!(game.ui.shop_tab, ShopTab::Buy);
     }
 
     #[test]

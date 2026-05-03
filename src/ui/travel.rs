@@ -24,14 +24,20 @@ pub(crate) fn draw(game: &Game) {
     );
     let visible_rows: usize = 5;
     let start = game
+        .ui
         .travel_cursor
         .saturating_sub(visible_rows.saturating_sub(1))
-        .min(game.travel_destinations.len().saturating_sub(visible_rows));
-    let end = (start + visible_rows).min(game.travel_destinations.len());
-    for (row, destination) in game.travel_destinations[start..end].iter().enumerate() {
+        .min(
+            game.sim
+                .travel_destinations
+                .len()
+                .saturating_sub(visible_rows),
+        );
+    let end = (start + visible_rows).min(game.sim.travel_destinations.len());
+    for (row, destination) in game.sim.travel_destinations[start..end].iter().enumerate() {
         let index = start + row;
         let row_y = y + 122.0 + row as f32 * 26.0;
-        if index == game.travel_cursor {
+        if index == game.ui.travel_cursor {
             draw_rectangle(
                 x + 36.0,
                 row_y - 20.0,
@@ -48,7 +54,7 @@ pub(crate) fn draw(game: &Game) {
             x + 42.0,
             row_y,
             20.0,
-            if index == game.travel_cursor {
+            if index == game.ui.travel_cursor {
                 Color::from_rgba(255, 224, 96, 255)
             } else {
                 WHITE

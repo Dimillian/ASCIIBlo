@@ -54,10 +54,12 @@ pub(crate) fn draw(game: &Game) {
     );
     let visible_rows: usize = 8;
     let visible_start = game
+        .ui
         .inventory_cursor
         .saturating_sub(visible_rows.saturating_sub(1))
-        .min(game.player.inventory.len().saturating_sub(visible_rows));
+        .min(game.sim.player.inventory.len().saturating_sub(visible_rows));
     for (row, (index, item)) in game
+        .sim
         .player
         .inventory
         .iter()
@@ -67,7 +69,7 @@ pub(crate) fn draw(game: &Game) {
         .enumerate()
     {
         let row_y = y + 172.0 + row as f32 * 36.0;
-        if index == game.inventory_cursor {
+        if index == game.ui.inventory_cursor {
             draw_rectangle(
                 left_x + 10.0,
                 row_y - 24.0,
@@ -81,7 +83,7 @@ pub(crate) fn draw(game: &Game) {
             left_x + 18.0,
             row_y,
             19.0,
-            if index == game.inventory_cursor {
+            if index == game.ui.inventory_cursor {
                 ITEM_SELECTION
             } else {
                 item.rarity.color()
@@ -105,15 +107,19 @@ pub(crate) fn draw(game: &Game) {
     draw_text(
         &format!(
             "{} / {} items",
-            game.player.inventory.len().min(game.inventory_cursor + 1),
-            game.player.inventory.len()
+            game.sim
+                .player
+                .inventory
+                .len()
+                .min(game.ui.inventory_cursor + 1),
+            game.sim.player.inventory.len()
         ),
         left_x + left_w - 82.0,
         y + 104.0,
         16.0,
         Color::from_rgba(180, 184, 190, 255),
     );
-    if let Some(item) = game.player.inventory.get(game.inventory_cursor) {
+    if let Some(item) = game.sim.player.inventory.get(game.ui.inventory_cursor) {
         draw_section_label("Selected", vec2(right_x, y + 102.0));
         draw_rectangle(
             right_x,
@@ -133,9 +139,9 @@ pub(crate) fn draw(game: &Game) {
         with_alpha(Color::from_rgba(10, 12, 16, 255), 0.72),
     );
     let gear = [
-        ("Weapon", game.player.equipment.weapon.as_ref()),
-        ("Armor", game.player.equipment.armor.as_ref()),
-        ("Charm", game.player.equipment.charm.as_ref()),
+        ("Weapon", game.sim.player.equipment.weapon.as_ref()),
+        ("Armor", game.sim.player.equipment.armor.as_ref()),
+        ("Charm", game.sim.player.equipment.charm.as_ref()),
     ];
     for (index, (label, item)) in gear.iter().enumerate() {
         let column_x = right_x + 18.0 + index as f32 * 150.0;
@@ -163,12 +169,12 @@ pub(crate) fn draw(game: &Game) {
         with_alpha(Color::from_rgba(10, 12, 16, 255), 0.72),
     );
     let derived = [
-        ("STR", game.player.stats.strength),
-        ("AGI", game.player.stats.agility),
-        ("VIT", game.player.stats.vitality),
-        ("POW", game.player.power()),
-        ("ARM", game.player.armor()),
-        ("HST", game.player.haste()),
+        ("STR", game.sim.player.stats.strength),
+        ("AGI", game.sim.player.stats.agility),
+        ("VIT", game.sim.player.stats.vitality),
+        ("POW", game.sim.player.power()),
+        ("ARM", game.sim.player.armor()),
+        ("HST", game.sim.player.haste()),
     ];
     for (index, (label, value)) in derived.iter().enumerate() {
         draw_stat_value(

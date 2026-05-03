@@ -1,4 +1,4 @@
-use super::{AbilityKind, DisciplineKind, Game, Notification, SkillXpToast};
+use super::{AbilityKind, DisciplineKind, Game, events::GameplayEvent};
 
 const AGILITY_XP_DISTANCE: f32 = 144.0;
 pub(super) const SKILL_XP_TOAST_TTL: f32 = 2.4;
@@ -14,12 +14,12 @@ impl Game {
             return;
         }
 
-        self.push_skill_xp_toast(kind, amount);
-        self.player.disciplines.get_mut(kind).xp += amount;
+        self.emit(GameplayEvent::DisciplineXpGained { kind, amount });
+        self.sim.player.disciplines.get_mut(kind).xp += amount;
 
         loop {
             let Some(level) = ({
-                let progress = self.player.disciplines.get_mut(kind);
+                let progress = self.sim.player.disciplines.get_mut(kind);
                 if progress.xp < progress.next_xp {
                     None
                 } else {
@@ -32,20 +32,10 @@ impl Game {
                 break;
             };
 
-            self.notifications.push(Notification {
-                text: format!("{} reaches level {}", kind.name(), level),
-                color: kind.color(),
-                ttl: 2.2,
-            });
-            self.log(format!("{} mastery reaches level {}.", kind.name(), level));
+            self.emit(GameplayEvent::DisciplineLeveled { kind, level });
 
             for ability in unlocked_abilities(kind, level) {
-                self.notifications.push(Notification {
-                    text: format!("Unlocked {}", ability.name()),
-                    color: kind.color(),
-                    ttl: 2.6,
-                });
-                self.log(format!("{} unlocks {}.", kind.name(), ability.name()));
+                self.emit(GameplayEvent::AbilityUnlocked { kind, ability });
             }
         }
     }
@@ -54,28 +44,11 @@ impl Game {
         if distance <= 0.0 {
             return;
         }
-        self.agility_distance_bank += distance;
-        while self.agility_distance_bank >= AGILITY_XP_DISTANCE {
-            self.agility_distance_bank -= AGILITY_XP_DISTANCE;
+        self.runtime.agility_distance_bank += distance;
+        while self.runtime.agility_distance_bank >= AGILITY_XP_DISTANCE {
+            self.runtime.agility_distance_bank -= AGILITY_XP_DISTANCE;
             self.award_discipline_xp(DisciplineKind::Agility, 1);
         }
-    }
-
-    fn push_skill_xp_toast(&mut self, kind: DisciplineKind, amount: i32) {
-        if let Some(toast) = self
-            .skill_xp_toasts
-            .iter_mut()
-            .find(|toast| toast.kind == kind)
-        {
-            toast.amount += amount;
-            toast.ttl = SKILL_XP_TOAST_TTL;
-            return;
-        }
-        self.skill_xp_toasts.push(SkillXpToast {
-            kind,
-            amount,
-            ttl: SKILL_XP_TOAST_TTL,
-        });
     }
 }
 

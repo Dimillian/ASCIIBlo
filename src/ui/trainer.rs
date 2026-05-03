@@ -24,7 +24,7 @@ pub(crate) fn draw(game: &Game) {
     );
     let mut cursor_x = x + 42.0;
     for kind in DisciplineKind::ALL {
-        let progress = game.player.disciplines.get(kind);
+        let progress = game.sim.player.disciplines.get(kind);
         let label = format!("{} {}", kind.name(), progress.level);
         draw_text(&label, cursor_x, y + 146.0, 18.0, kind.color());
         cursor_x += measure_text(&label, None, 18, 1.0).width + 24.0;

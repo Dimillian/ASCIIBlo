@@ -26,14 +26,14 @@ pub(crate) fn draw(game: &Game) {
         WHITE,
     );
     draw_text(
-        &format!("Gold {}", game.player.stats.gold),
+        &format!("Gold {}", game.sim.player.stats.gold),
         x + w - 130.0,
         y + 34.0,
         22.0,
         WHITE,
     );
     draw_text(
-        match game.shop_tab {
+        match game.ui.shop_tab {
             ShopTab::Buy => "[ Buy ]   Sell",
             ShopTab::Sell => "Buy   [ Sell ]",
         },
@@ -46,13 +46,13 @@ pub(crate) fn draw(game: &Game) {
     let content_y = y + 132.0;
     draw_section_box(Rect::new(x + 24.0, content_y, 360.0, 232.0), "Stock");
     draw_section_box(Rect::new(x + 408.0, content_y, 328.0, 232.0), "Inspect");
-    let items: &[Item] = match game.shop_tab {
-        ShopTab::Buy => &game.merchant_stock,
-        ShopTab::Sell => &game.player.inventory,
+    let items: &[Item] = match game.ui.shop_tab {
+        ShopTab::Buy => &game.sim.merchant_stock,
+        ShopTab::Sell => &game.sim.player.inventory,
     };
     for (index, item) in items.iter().enumerate() {
         let row_y = y + 170.0 + index as f32 * 32.0;
-        if index == game.shop_cursor {
+        if index == game.ui.shop_cursor {
             draw_rectangle(
                 x + 36.0,
                 row_y - 22.0,
@@ -61,7 +61,7 @@ pub(crate) fn draw(game: &Game) {
                 with_alpha(ITEM_SELECTION, 0.12),
             );
         }
-        let price = match game.shop_tab {
+        let price = match game.ui.shop_tab {
             ShopTab::Buy => item.value,
             ShopTab::Sell => (item.value as f32 * 0.6).round() as i32,
         };
@@ -70,14 +70,14 @@ pub(crate) fn draw(game: &Game) {
             x + 42.0,
             row_y,
             20.0,
-            if index == game.shop_cursor {
+            if index == game.ui.shop_cursor {
                 ITEM_SELECTION
             } else {
                 item.rarity.color()
             },
         );
     }
-    if let Some(item) = items.get(game.shop_cursor) {
+    if let Some(item) = items.get(game.ui.shop_cursor) {
         draw_item_detail(item, vec2(x + 426.0, y + 170.0));
     }
     let mut hint_x = x + 24.0;

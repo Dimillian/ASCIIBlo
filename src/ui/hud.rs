@@ -22,8 +22,8 @@ pub(crate) fn draw(game: &Game) {
     draw_text(
         &format!(
             "HP {}/{}",
-            game.player.hp.round() as i32,
-            game.player.max_hp().round() as i32
+            game.sim.player.hp.round() as i32,
+            game.sim.player.max_hp().round() as i32
         ),
         178.0,
         28.0,
@@ -33,14 +33,14 @@ pub(crate) fn draw(game: &Game) {
     draw_bar(
         vec2(178.0, 40.0),
         170.0,
-        game.player.hp / game.player.max_hp(),
+        game.sim.player.hp / game.sim.player.max_hp(),
         Color::from_rgba(130, 236, 126, 255),
     );
     draw_text(
         &format!(
             "MP {}/{}",
-            game.player.mana.round() as i32,
-            game.player.max_mana().round() as i32
+            game.sim.player.mana.round() as i32,
+            game.sim.player.max_mana().round() as i32
         ),
         370.0,
         28.0,
@@ -50,16 +50,16 @@ pub(crate) fn draw(game: &Game) {
     draw_bar(
         vec2(370.0, 40.0),
         150.0,
-        game.player.mana / game.player.max_mana(),
+        game.sim.player.mana / game.sim.player.max_mana(),
         Color::from_rgba(112, 180, 255, 255),
     );
     draw_text(
         &format!(
             "LV {}  XP {}/{}  Gold {}",
-            game.player.stats.level,
-            game.player.stats.xp,
-            game.player.stats.next_xp,
-            game.player.stats.gold
+            game.sim.player.stats.level,
+            game.sim.player.stats.xp,
+            game.sim.player.stats.next_xp,
+            game.sim.player.stats.gold
         ),
         548.0,
         28.0,
@@ -76,7 +76,7 @@ pub(crate) fn draw(game: &Game) {
     draw_bar(
         vec2(548.0, 40.0),
         220.0,
-        game.player.stats.xp as f32 / game.player.stats.next_xp as f32,
+        game.sim.player.stats.xp as f32 / game.sim.player.stats.next_xp as f32,
         Color::from_rgba(255, 224, 96, 255),
     );
 
@@ -84,8 +84,8 @@ pub(crate) fn draw(game: &Game) {
     draw_text(
         &format!(
             "{}  level {}",
-            game.world.region_name(game.player.pos),
-            game.world.biome_level(game.player.pos)
+            game.world.region_name(game.sim.player.pos),
+            game.world.biome_level(game.sim.player.pos)
         ),
         controls_x,
         26.0,
@@ -103,8 +103,8 @@ pub(crate) fn draw(game: &Game) {
         Color::from_rgba(255, 224, 96, 180),
     );
     let mut bottom_x = 22.0;
-    for (index, ability) in game.player.bound_abilities.iter().copied().enumerate() {
-        let cooldown = game.player.ability_cooldowns[ability.index()];
+    for (index, ability) in game.sim.player.bound_abilities.iter().copied().enumerate() {
+        let cooldown = game.sim.player.ability_cooldowns[ability.index()];
         bottom_x += draw_ability_hint(
             &(index + 1).to_string(),
             ability,
@@ -119,16 +119,16 @@ pub(crate) fn draw(game: &Game) {
         "C",
         "character",
         vec2(bottom_x, bar_y + 17.0),
-        game.player.stats.unspent_stat_points > 0,
+        game.sim.player.stats.unspent_stat_points > 0,
     ) + 14.0;
     bottom_x += draw_hotkey_hint("B", "mastery", vec2(bottom_x, bar_y + 17.0)) + 14.0;
     draw_hotkey_hint("M", "map", vec2(bottom_x, bar_y + 17.0));
     draw_text(
         &format!(
             "POW {}  ARM {}  HST {}",
-            game.player.power(),
-            game.player.armor(),
-            game.player.haste()
+            game.sim.player.power(),
+            game.sim.player.armor(),
+            game.sim.player.haste()
         ),
         screen_width() - 238.0,
         bar_y + 35.0,
@@ -216,11 +216,11 @@ fn draw_skill_feedback(game: &Game) {
     let x = screen_width() - panel_w - 18.0;
     let mut y = 300.0;
 
-    for notification in game.notifications.iter().rev().take(3) {
+    for notification in game.fx.notifications.iter().rev().take(3) {
         draw_feedback_row(x, y, panel_w, &notification.text, notification.color, 1.0);
         y += 34.0;
     }
-    for toast in game.skill_xp_toasts.iter().rev().take(3) {
+    for toast in game.fx.skill_xp_toasts.iter().rev().take(3) {
         draw_feedback_row(
             x,
             y,
@@ -256,10 +256,11 @@ fn draw_log(game: &Game) {
     let line_h = 17.0;
     let row_gap = 4.0;
     let rows: Vec<_> = game
+        .fx
         .log
         .iter()
         .rev()
-        .skip(game.log_scroll_offset)
+        .skip(game.fx.log_scroll_offset)
         .take(6)
         .map(|line| {
             let wrapped = wrap_text(line, panel_w - 68.0, 16.0, 2);
@@ -284,9 +285,9 @@ fn draw_log(game: &Game) {
         19.0,
         Color::from_rgba(255, 224, 96, 255),
     );
-    if game.log_scroll_offset > 0 {
+    if game.fx.log_scroll_offset > 0 {
         draw_text(
-            &format!("+{}", game.log_scroll_offset),
+            &format!("+{}", game.fx.log_scroll_offset),
             panel_x + panel_w - 36.0,
             panel_y + 23.0,
             16.0,
@@ -295,7 +296,7 @@ fn draw_log(game: &Game) {
     }
     let mut cursor_y = panel_y + title_h + 10.0;
     for (index, (line, wrapped, row_h)) in rows.iter().enumerate() {
-        let latest_visible = game.log_scroll_offset == 0 && index == 0;
+        let latest_visible = game.fx.log_scroll_offset == 0 && index == 0;
         let color = log_color(line, latest_visible);
         if latest_visible {
             draw_rectangle(
@@ -364,12 +365,12 @@ fn draw_minimap(game: &Game) {
     let map_y = y + 32.0;
     let scale_x = map_size.x / (half_w * 2) as f32;
     let scale_y = map_size.y / (half_h * 2) as f32;
-    let player_tile = World::world_to_tile(game.player.pos);
+    let player_tile = World::world_to_tile(game.sim.player.pos);
     draw_text(
         &format!(
             "{}  L{}",
-            game.world.region_name(game.player.pos),
-            game.world.biome_level(game.player.pos)
+            game.world.region_name(game.sim.player.pos),
+            game.world.biome_level(game.sim.player.pos)
         ),
         x + 12.0,
         y + 22.0,
@@ -397,7 +398,7 @@ fn draw_minimap(game: &Game) {
             );
         }
     }
-    for npc in &game.npcs {
+    for npc in &game.sim.npcs {
         let npc_tile = World::world_to_tile(npc.pos);
         draw_circle(
             map_x + (npc_tile.x - player_tile.x + half_w) as f32 * scale_x,
@@ -415,7 +416,7 @@ fn draw_minimap(game: &Game) {
 }
 
 fn draw_hovered_monster_tooltip(game: &Game) {
-    if game.ui_mode != crate::game::UiMode::None {
+    if game.ui.mode != crate::game::UiMode::None {
         return;
     }
     let Some(monster) = game.hovered_monster() else {
@@ -473,13 +474,14 @@ fn draw_hovered_monster_tooltip(game: &Game) {
 
 fn draw_nearest_loot_tooltip(game: &Game) {
     let Some(loot) = game
+        .sim
         .loot
         .iter()
-        .filter(|loot| loot.pos.distance(game.player.pos) <= 42.0)
+        .filter(|loot| loot.pos.distance(game.sim.player.pos) <= 42.0)
         .min_by(|a, b| {
             a.pos
-                .distance(game.player.pos)
-                .total_cmp(&b.pos.distance(game.player.pos))
+                .distance(game.sim.player.pos)
+                .total_cmp(&b.pos.distance(game.sim.player.pos))
         })
     else {
         return;

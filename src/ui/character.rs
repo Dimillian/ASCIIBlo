@@ -37,21 +37,21 @@ pub(crate) fn draw(game: &Game) {
     let attribute_rows = vec![
         StatRow {
             label: "Strength",
-            value: game.player.stats.strength.to_string(),
+            value: game.sim.player.stats.strength.to_string(),
             detail: format!(
                 "Strength grants 2 power per point. Current base strength {} contributes {} power before gear.",
-                game.player.stats.strength,
-                game.player.stats.strength * 2
+                game.sim.player.stats.strength,
+                game.sim.player.stats.strength * 2
             ),
             cursor_index: Some(0),
         },
         StatRow {
             label: "Agility",
-            value: game.player.stats.agility.to_string(),
+            value: game.sim.player.stats.agility.to_string(),
             detail: format!(
                 "Agility raises haste and critical hit chance. Current agility adds {} haste and sets crit chance to {:.0}%.",
-                game.player.stats.agility,
-                game.player.crit_chance() * 100.0
+                game.sim.player.stats.agility,
+                game.sim.player.crit_chance() * 100.0
             ),
             cursor_index: Some(1),
         },
@@ -59,12 +59,12 @@ pub(crate) fn draw(game: &Game) {
             label: "Vitality",
             value: format!(
                 "{} (+{} gear)",
-                game.player.stats.vitality,
-                game.player.equipment.bonus_vitality()
+                game.sim.player.stats.vitality,
+                game.sim.player.equipment.bonus_vitality()
             ),
             detail: format!(
                 "Vitality grants 7 maximum life per point and 1 armor every 2 base points. Gear adds {} vitality.",
-                game.player.equipment.bonus_vitality()
+                game.sim.player.equipment.bonus_vitality()
             ),
             cursor_index: Some(2),
         },
@@ -72,8 +72,8 @@ pub(crate) fn draw(game: &Game) {
             label: "Life",
             value: format!(
                 "{} / {}",
-                game.player.hp.round() as i32,
-                game.player.max_hp().round() as i32
+                game.sim.player.hp.round() as i32,
+                game.sim.player.max_hp().round() as i32
             ),
             detail: "Life is lost when monsters hit you. If it reaches 0, you wake in town and lose some gold."
                 .into(),
@@ -83,8 +83,8 @@ pub(crate) fn draw(game: &Game) {
             label: "Mana",
             value: format!(
                 "{} / {}",
-                game.player.mana.round() as i32,
-                game.player.max_mana().round() as i32
+                game.sim.player.mana.round() as i32,
+                game.sim.player.max_mana().round() as i32
             ),
             detail: "Mana fuels active skills. Maximum mana rises with level, while Magic mastery improves regeneration."
                 .into(),
@@ -92,7 +92,7 @@ pub(crate) fn draw(game: &Game) {
         },
         StatRow {
             label: "Gold",
-            value: game.player.stats.gold.to_string(),
+            value: game.sim.player.stats.gold.to_string(),
             detail: "Gold buys merchant gear. Death costs 20% of the gold you are carrying.".into(),
             cursor_index: None,
         },
@@ -101,41 +101,41 @@ pub(crate) fn draw(game: &Game) {
     let combat_rows = vec![
         StatRow {
             label: "Power",
-            value: game.player.power().to_string(),
+            value: game.sim.player.power().to_string(),
             detail: format!(
                 "Power is your weapon baseline. It equals strength x2 plus {} gear power before attack rolls.",
-                game.player.equipment.bonus_power()
+                game.sim.player.equipment.bonus_power()
             ),
             cursor_index: None,
         },
         StatRow {
             label: "Armor",
-            value: game.player.armor().to_string(),
+            value: game.sim.player.armor().to_string(),
             detail: format!(
                 "Armor subtracts from incoming monster damage, but hits still deal at least 1. Current value includes {} gear armor.",
-                game.player.equipment.bonus_armor()
+                game.sim.player.equipment.bonus_armor()
             ),
             cursor_index: None,
         },
         StatRow {
             label: "Haste",
-            value: game.player.haste().to_string(),
+            value: game.sim.player.haste().to_string(),
             detail: format!(
                 "Haste increases movement speed and shortens basic attack recovery. Current value includes {} gear haste.",
-                game.player.equipment.bonus_haste()
+                game.sim.player.equipment.bonus_haste()
             ),
             cursor_index: None,
         },
         StatRow {
             label: "Crit chance",
-            value: format!("{:.0}%", game.player.crit_chance() * 100.0),
+            value: format!("{:.0}%", game.sim.player.crit_chance() * 100.0),
             detail: "Critical chance starts at 8%, gains 1% per agility, and caps at 35%. Critical hits deal double damage."
                 .into(),
             cursor_index: None,
         },
         StatRow {
             label: "Attack delay",
-            value: format!("{:.2}s", game.player.attack_interval()),
+            value: format!("{:.2}s", game.sim.player.attack_interval()),
             detail:
                 "Basic attacks recover faster with haste. The interval cannot go below 0.16 seconds."
                     .into(),
@@ -143,7 +143,7 @@ pub(crate) fn draw(game: &Game) {
         },
         StatRow {
             label: "Move speed",
-            value: format!("{:.0}", game.player.move_speed()),
+            value: format!("{:.0}", game.sim.player.move_speed()),
             detail:
                 "Movement speed starts at 150 and gains 4 for every point of haste.".into(),
             cursor_index: None,
@@ -152,20 +152,20 @@ pub(crate) fn draw(game: &Game) {
 
     let progression_rows = vec![StatRow {
         label: "Stat points",
-        value: game.player.stats.unspent_stat_points.to_string(),
+        value: game.sim.player.stats.unspent_stat_points.to_string(),
         detail: "Spend stat points on Strength, Agility, or Vitality with Enter.".into(),
         cursor_index: None,
     }];
 
     let hover = game.ui_hover_position();
-    let mut focused = draw_rows(&attribute_rows, left, game.character_cursor, hover);
+    let mut focused = draw_rows(&attribute_rows, left, game.ui.character_cursor, hover);
     focused = focused
-        .or_else(|| draw_rows(&combat_rows, middle, game.character_cursor, hover))
+        .or_else(|| draw_rows(&combat_rows, middle, game.ui.character_cursor, hover))
         .or_else(|| {
             draw_rows(
                 &progression_rows,
                 Rect::new(right.x + 18.0, right.y + 194.0, right.w - 36.0, 52.0),
-                game.character_cursor,
+                game.ui.character_cursor,
                 hover,
             )
         });
@@ -187,10 +187,10 @@ fn draw_overview(game: &Game, pos: Vec2) {
     draw_text(
         &format!(
             "Level {}   XP {} / {}   Gold {}",
-            game.player.stats.level,
-            game.player.stats.xp,
-            game.player.stats.next_xp,
-            game.player.stats.gold
+            game.sim.player.stats.level,
+            game.sim.player.stats.xp,
+            game.sim.player.stats.next_xp,
+            game.sim.player.stats.gold
         ),
         pos.x,
         pos.y,
@@ -198,7 +198,7 @@ fn draw_overview(game: &Game, pos: Vec2) {
         WHITE,
     );
     draw_text(
-        &format!("Stat points {}", game.player.stats.unspent_stat_points),
+        &format!("Stat points {}", game.sim.player.stats.unspent_stat_points),
         pos.x + 378.0,
         pos.y,
         18.0,
@@ -263,7 +263,7 @@ fn selected_detail<'a>(
     attribute_rows
         .iter()
         .chain(progression_rows.iter())
-        .find(|row| row.cursor_index == Some(game.character_cursor))
+        .find(|row| row.cursor_index == Some(game.ui.character_cursor))
         .map(|row| row.detail.as_str())
         .unwrap_or("Hover a stat to inspect what it does.")
 }
@@ -281,14 +281,14 @@ fn draw_progression_header(game: &Game, rect: Rect) {
     draw_rectangle(
         rect.x + 18.0,
         top + 18.0,
-        (rect.w - 36.0) * (game.player.stats.xp as f32 / game.player.stats.next_xp as f32),
+        (rect.w - 36.0) * (game.sim.player.stats.xp as f32 / game.sim.player.stats.next_xp as f32),
         18.0,
         with_alpha(GOLD, 0.72),
     );
     draw_text(
         &format!(
             "{} / {} xp",
-            game.player.stats.xp, game.player.stats.next_xp
+            game.sim.player.stats.xp, game.sim.player.stats.next_xp
         ),
         rect.x + 28.0,
         top + 32.0,

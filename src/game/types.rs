@@ -5,6 +5,8 @@ use crate::{
     world::{SettlementSite, SettlementTier},
 };
 
+use super::ability_defs::{ability_color, ability_def};
+
 pub struct Stats {
     pub level: i32,
     pub xp: i32,
@@ -120,88 +122,35 @@ impl AbilityKind {
     }
 
     pub fn name(self) -> &'static str {
-        match self {
-            Self::Cleave => "Cleave",
-            Self::Rush => "Rush",
-            Self::Whirlwind => "Whirlwind",
-            Self::Execute => "Execute",
-            Self::Fireball => "Fireball",
-            Self::Nova => "Nova",
-            Self::IceBolt => "Ice Bolt",
-            Self::Meteor => "Meteor",
-        }
+        ability_def(self).name
     }
 
     pub fn glyph(self) -> &'static str {
-        match self {
-            Self::Cleave => "/",
-            Self::Rush => ">",
-            Self::Whirlwind => "@",
-            Self::Execute => "!",
-            Self::Fireball => "*",
-            Self::Nova => "O",
-            Self::IceBolt => "-",
-            Self::Meteor => "v",
-        }
+        ability_def(self).glyph
     }
 
     pub fn discipline(self) -> DisciplineKind {
-        match self {
-            Self::Cleave | Self::Rush | Self::Whirlwind | Self::Execute => DisciplineKind::Melee,
-            Self::Fireball | Self::Nova | Self::IceBolt | Self::Meteor => DisciplineKind::Magic,
-        }
+        ability_def(self).discipline
     }
 
     pub fn unlock_level(self) -> i32 {
-        match self {
-            Self::Cleave | Self::Fireball => 1,
-            Self::Rush | Self::Nova => 2,
-            Self::Whirlwind | Self::IceBolt => 4,
-            Self::Execute | Self::Meteor => 8,
-        }
+        ability_def(self).unlock_level
     }
 
     pub fn mana_cost(self) -> f32 {
-        match self {
-            Self::Cleave => 10.0,
-            Self::Rush => 8.0,
-            Self::Whirlwind => 16.0,
-            Self::Execute => 14.0,
-            Self::Fireball => 12.0,
-            Self::Nova => 14.0,
-            Self::IceBolt => 10.0,
-            Self::Meteor => 22.0,
-        }
+        ability_def(self).mana_cost
     }
 
     pub fn cooldown(self) -> f32 {
-        match self {
-            Self::Cleave => 2.2,
-            Self::Rush => 1.8,
-            Self::Whirlwind => 3.0,
-            Self::Execute => 2.6,
-            Self::Fireball => 1.2,
-            Self::Nova => 3.5,
-            Self::IceBolt => 1.0,
-            Self::Meteor => 4.0,
-        }
+        ability_def(self).cooldown
     }
 
     pub fn summary(self) -> &'static str {
-        match self {
-            Self::Cleave => "Sweep a broad melee arc in front of you.",
-            Self::Rush => "Dash forward and strike enemies reached by the rush.",
-            Self::Whirlwind => "Spin through nearby enemies in every direction.",
-            Self::Execute => "Deliver a crushing frontal hit that punishes wounded foes.",
-            Self::Fireball => "Launch a fireball that explodes on impact.",
-            Self::Nova => "Release a close-range burst around yourself.",
-            Self::IceBolt => "Fire a fast bolt that chills the first enemy it hits.",
-            Self::Meteor => "Call down a delayed blast at the aimed position.",
-        }
+        ability_def(self).summary
     }
 
     pub fn color(self) -> Color {
-        self.discipline().color()
+        ability_color(self)
     }
 }
 

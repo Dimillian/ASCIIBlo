@@ -39,25 +39,25 @@ pub(crate) fn draw(game: &Game) {
     draw_panel(
         disciplines_rect,
         "Disciplines",
-        game.skill_book_focus == SkillBookFocus::Disciplines,
+        game.ui.skill_book_focus == SkillBookFocus::Disciplines,
     );
     draw_panel(
         skills_rect,
-        if abilities_for_discipline(DisciplineKind::ALL[game.skill_book_cursor]).is_empty() {
+        if abilities_for_discipline(DisciplineKind::ALL[game.ui.skill_book_cursor]).is_empty() {
             "Milestones"
         } else {
             "Skills"
         },
-        game.skill_book_focus == SkillBookFocus::Skills,
+        game.ui.skill_book_focus == SkillBookFocus::Skills,
     );
     draw_panel(
         detail_rect,
         "Detail",
-        game.skill_book_focus == SkillBookFocus::Detail,
+        game.ui.skill_book_focus == SkillBookFocus::Detail,
     );
 
     draw_disciplines(game, disciplines_rect);
-    let discipline = DisciplineKind::ALL[game.skill_book_cursor];
+    let discipline = DisciplineKind::ALL[game.ui.skill_book_cursor];
     let selected = draw_skills(game, discipline, skills_rect);
     draw_detail(game, discipline, selected, detail_rect);
 
@@ -88,7 +88,7 @@ fn draw_loadout_strip(game: &Game, rect: Rect) {
     );
 
     let slot_w = 244.0;
-    for (index, ability) in game.player.bound_abilities.iter().copied().enumerate() {
+    for (index, ability) in game.sim.player.bound_abilities.iter().copied().enumerate() {
         let slot = Rect::new(
             rect.x + 320.0 + index as f32 * 262.0,
             rect.y + 10.0,
@@ -130,7 +130,7 @@ fn draw_disciplines(game: &Game, rect: Rect) {
             rect.w - 24.0,
             58.0,
         );
-        let selected = index == game.skill_book_cursor;
+        let selected = index == game.ui.skill_book_cursor;
         if selected {
             draw_rectangle(
                 row.x,
@@ -139,7 +139,7 @@ fn draw_disciplines(game: &Game, rect: Rect) {
                 row.h,
                 with_alpha(
                     GOLD,
-                    if game.skill_book_focus == SkillBookFocus::Disciplines {
+                    if game.ui.skill_book_focus == SkillBookFocus::Disciplines {
                         0.18
                     } else {
                         0.10
@@ -147,7 +147,7 @@ fn draw_disciplines(game: &Game, rect: Rect) {
                 ),
             );
         }
-        let progress = game.player.disciplines.get(kind);
+        let progress = game.sim.player.disciplines.get(kind);
         draw_text(
             kind.name(),
             row.x + 10.0,
@@ -192,7 +192,7 @@ fn draw_skills(game: &Game, discipline: DisciplineKind, rect: Rect) -> Option<Ab
         return None;
     }
 
-    let selected = abilities[game.skill_book_ability_cursor.min(abilities.len() - 1)];
+    let selected = abilities[game.ui.skill_book_ability_cursor.min(abilities.len() - 1)];
     for (index, ability) in abilities.iter().copied().enumerate() {
         let row = Rect::new(
             rect.x + 12.0,
@@ -200,8 +200,8 @@ fn draw_skills(game: &Game, discipline: DisciplineKind, rect: Rect) -> Option<Ab
             rect.w - 24.0,
             58.0,
         );
-        let unlocked = game.player.is_ability_unlocked(ability);
-        let is_selected = index == game.skill_book_ability_cursor;
+        let unlocked = game.sim.player.is_ability_unlocked(ability);
+        let is_selected = index == game.ui.skill_book_ability_cursor;
         if is_selected {
             draw_rectangle(
                 row.x,
@@ -210,7 +210,7 @@ fn draw_skills(game: &Game, discipline: DisciplineKind, rect: Rect) -> Option<Ab
                 row.h,
                 with_alpha(
                     GOLD,
-                    if game.skill_book_focus == SkillBookFocus::Skills {
+                    if game.ui.skill_book_focus == SkillBookFocus::Skills {
                         0.22
                     } else {
                         0.12
@@ -251,7 +251,7 @@ fn draw_skills(game: &Game, discipline: DisciplineKind, rect: Rect) -> Option<Ab
             15.0,
             MUTED,
         );
-        if let Some(slot) = game.player.bound_slot(ability) {
+        if let Some(slot) = game.sim.player.bound_slot(ability) {
             draw_badge(
                 &format!("Bound {}", slot + 1),
                 row.x + row.w - 76.0,
@@ -264,7 +264,7 @@ fn draw_skills(game: &Game, discipline: DisciplineKind, rect: Rect) -> Option<Ab
 }
 
 fn draw_passive_milestones(game: &Game, discipline: DisciplineKind, rect: Rect) {
-    let progress = game.player.disciplines.get(discipline);
+    let progress = game.sim.player.disciplines.get(discipline);
     draw_text(
         "Passive discipline",
         rect.x + 16.0,
@@ -299,7 +299,7 @@ fn draw_passive_milestones(game: &Game, discipline: DisciplineKind, rect: Rect) 
 }
 
 fn draw_detail(game: &Game, discipline: DisciplineKind, selected: Option<AbilityKind>, rect: Rect) {
-    let progress = game.player.disciplines.get(discipline);
+    let progress = game.sim.player.disciplines.get(discipline);
     draw_text(discipline.name(), rect.x + 16.0, rect.y + 30.0, 24.0, GOLD);
     draw_text(
         &format!("Level {}", progress.level),
@@ -388,14 +388,14 @@ fn draw_detail(game: &Game, discipline: DisciplineKind, selected: Option<Ability
             rect.x + 16.0,
             rect.y + 250.0 + index as f32 * 20.0,
             17.0,
-            if game.player.is_ability_unlocked(ability) {
+            if game.sim.player.is_ability_unlocked(ability) {
                 WHITE
             } else {
                 MUTED
             },
         );
     }
-    if !game.player.is_ability_unlocked(ability) {
+    if !game.sim.player.is_ability_unlocked(ability) {
         draw_text(
             &format!("Unlocks at level {}", ability.unlock_level()),
             rect.x + 16.0,
@@ -418,20 +418,20 @@ fn current_bonus(game: &Game, kind: DisciplineKind) -> String {
     match kind {
         DisciplineKind::Melee => format!(
             "+{} physical damage on basic attacks and melee skills.",
-            game.player.melee_damage_bonus()
+            game.sim.player.melee_damage_bonus()
         ),
         DisciplineKind::Magic => format!(
             "+{} spell damage. +{:.1} mana/sec regeneration.",
-            game.player.magic_damage_bonus(),
-            game.player.magic_regen_bonus()
+            game.sim.player.magic_damage_bonus(),
+            game.sim.player.magic_regen_bonus()
         ),
         DisciplineKind::Armor => format!(
             "+{} effective armor from mastery.",
-            game.player.armor_mastery_bonus()
+            game.sim.player.armor_mastery_bonus()
         ),
         DisciplineKind::Agility => format!(
             "+{} movement speed from mastery.",
-            game.player.agility_mastery_bonus()
+            game.sim.player.agility_mastery_bonus()
         ),
     }
 }
