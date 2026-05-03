@@ -3,8 +3,8 @@ use macroquad::prelude::*;
 use crate::{game::Game, render::with_alpha};
 
 use super::widgets::{
-    draw_hotkey_hint, draw_item_detail, draw_modal_backdrop, draw_modal_frame, draw_section_label,
-    draw_stat_value,
+    ITEM_SELECTION, draw_hotkey_hint, draw_item_detail, draw_modal_backdrop, draw_modal_frame,
+    draw_section_label, draw_stat_value,
 };
 
 pub(crate) fn draw(game: &Game) {
@@ -73,7 +73,7 @@ pub(crate) fn draw(game: &Game) {
                 row_y - 24.0,
                 left_w - 20.0,
                 30.0,
-                with_alpha(item.rarity.color(), 0.16),
+                with_alpha(ITEM_SELECTION, 0.16),
             );
         }
         draw_text(
@@ -82,7 +82,7 @@ pub(crate) fn draw(game: &Game) {
             row_y,
             19.0,
             if index == game.inventory_cursor {
-                Color::from_rgba(255, 224, 96, 255)
+                ITEM_SELECTION
             } else {
                 item.rarity.color()
             },

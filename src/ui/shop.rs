@@ -7,7 +7,8 @@ use crate::{
 };
 
 use super::widgets::{
-    draw_hotkey_hint, draw_item_detail, draw_modal_backdrop, draw_modal_frame, draw_section_box,
+    ITEM_SELECTION, draw_hotkey_hint, draw_item_detail, draw_modal_backdrop, draw_modal_frame,
+    draw_section_box,
 };
 
 pub(crate) fn draw(game: &Game) {
@@ -57,7 +58,7 @@ pub(crate) fn draw(game: &Game) {
                 row_y - 22.0,
                 336.0,
                 28.0,
-                with_alpha(item.rarity.color(), 0.12),
+                with_alpha(ITEM_SELECTION, 0.12),
             );
         }
         let price = match game.shop_tab {
@@ -70,7 +71,7 @@ pub(crate) fn draw(game: &Game) {
             row_y,
             20.0,
             if index == game.shop_cursor {
-                Color::from_rgba(255, 224, 96, 255)
+                ITEM_SELECTION
             } else {
                 item.rarity.color()
             },

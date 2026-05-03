@@ -2,6 +2,8 @@ use macroquad::prelude::*;
 
 use crate::{content::Item, render::with_alpha};
 
+pub(crate) const ITEM_SELECTION: Color = Color::new(128.0 / 255.0, 214.0 / 255.0, 1.0, 1.0);
+
 pub(crate) fn draw_modal_backdrop() {
     draw_rectangle(
         0.0,
