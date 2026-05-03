@@ -206,6 +206,7 @@ impl PreviewMode {
                 ] {
                     game.reveal_around_tile(center, 10);
                 }
+                reveal_preview_towns(game, 4);
             }
             PreviewMode::ShopBuy => game.ui_mode = UiMode::Merchant,
             PreviewMode::ShopSell => {
@@ -213,7 +214,23 @@ impl PreviewMode {
                 game.shop_tab = ShopTab::Sell;
             }
             PreviewMode::Trainer => game.ui_mode = UiMode::Trainer,
-            PreviewMode::Travel => game.ui_mode = UiMode::Travel,
+            PreviewMode::Travel => {
+                reveal_preview_towns(game, 5);
+                game.ui_mode = UiMode::Travel;
+            }
+        }
+    }
+}
+
+fn reveal_preview_towns(game: &mut Game, count: usize) {
+    let sites = game.world.settlements_near_tile(ivec2(0, 0), 1_200);
+    for site in sites
+        .into_iter()
+        .filter(|site| site.tier == crate::world::SettlementTier::Town)
+    {
+        game.reveal_around_tile(site.center, 2);
+        if game.travel_destinations.len() >= count {
+            break;
         }
     }
 }

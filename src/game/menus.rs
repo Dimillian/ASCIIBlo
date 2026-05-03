@@ -1,8 +1,11 @@
 use macroquad::prelude::*;
 
-use crate::{content::NpcKind, world::World};
+use crate::{
+    content::NpcKind,
+    world::{LandmarkKind, World},
+};
 
-use super::{EXPLORATION_RADIUS, Game, ShopTab, TRAVEL_DESTINATIONS, UiMode};
+use super::{EXPLORATION_RADIUS, Game, ShopTab, UiMode};
 
 impl Game {
     pub(super) fn update_inventory_controls(&mut self) {
@@ -186,14 +189,15 @@ impl Game {
         if self.input.inventory_up_pressed {
             self.travel_cursor = self.travel_cursor.saturating_sub(1);
         }
-        if self.input.inventory_down_pressed {
-            self.travel_cursor = (self.travel_cursor + 1).min(TRAVEL_DESTINATIONS.len() - 1);
+        if self.input.inventory_down_pressed && !self.travel_destinations.is_empty() {
+            self.travel_cursor = (self.travel_cursor + 1).min(self.travel_destinations.len() - 1);
         }
-        if self.input.inventory_equip_pressed {
-            let destination = TRAVEL_DESTINATIONS[self.travel_cursor];
+        if self.input.inventory_equip_pressed && !self.travel_destinations.is_empty() {
+            let destination = self.travel_destinations[self.travel_cursor].clone();
             self.player.pos = World::tile_center(destination.pos);
             self.player.vel = Vec2::ZERO;
             self.reveal_around_tile(destination.pos, EXPLORATION_RADIUS);
+            self.sync_local_npcs();
             self.ui_mode = UiMode::None;
             self.log(format!("Rill sends you toward {}.", destination.name));
         }
@@ -221,14 +225,21 @@ impl Game {
         }
     }
 
-    pub(super) fn interact_with_nearby_npc(&mut self) {
+    pub(super) fn interact_with_nearby_world_entity(&mut self) {
+        if self.interact_with_nearby_npc() {
+            return;
+        }
+        self.interact_with_nearby_landmark();
+    }
+
+    pub(super) fn interact_with_nearby_npc(&mut self) -> bool {
         let Some(kind) = self
             .npcs
             .iter()
             .find(|npc| npc.pos.distance(self.player.pos) <= 42.0)
             .map(|npc| npc.kind)
         else {
-            return;
+            return false;
         };
         self.log(format!("{}: {}", kind.name(), kind.greeting()));
         self.ui_mode = match kind {
@@ -236,5 +247,35 @@ impl Game {
             NpcKind::Trainer => UiMode::Trainer,
             NpcKind::Wayfinder => UiMode::Travel,
         };
+        true
+    }
+
+    fn interact_with_nearby_landmark(&mut self) {
+        let Some(landmark) = self.world.landmark_at_world(self.player.pos) else {
+            return;
+        };
+        if self.used_landmarks.contains(&landmark.id) {
+            self.log(format!(
+                "The {} is quiet now.",
+                landmark.kind.name().to_lowercase()
+            ));
+            return;
+        }
+        match landmark.kind {
+            LandmarkKind::Shrine => {
+                self.player.mana = self.player.max_mana();
+                self.log("The shrine answers. Mana restored.".into());
+                self.used_landmarks.insert(landmark.id);
+            }
+            LandmarkKind::Well => {
+                self.player.hp = self.player.max_hp();
+                self.log("Cool water steadies you. Life restored.".into());
+                self.used_landmarks.insert(landmark.id);
+            }
+            LandmarkKind::Camp => self.log("The camp is cold, but recently used.".into()),
+            LandmarkKind::Graveyard => self.log("Names fade from the stones.".into()),
+            LandmarkKind::StandingStones => self.log("The stones hum with old weather.".into()),
+            LandmarkKind::Cart => self.log("The cart has already been picked clean.".into()),
+        }
     }
 }

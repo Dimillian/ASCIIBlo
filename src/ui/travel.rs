@@ -1,10 +1,6 @@
 use macroquad::prelude::*;
 
-use crate::{
-    content::NpcKind,
-    game::{Game, TRAVEL_DESTINATIONS},
-    render::with_alpha,
-};
+use crate::{content::NpcKind, game::Game, render::with_alpha};
 
 use super::widgets::{draw_hotkey_hint, draw_modal_backdrop, draw_modal_frame, draw_section_box};
 
@@ -26,8 +22,15 @@ pub(crate) fn draw(game: &Game) {
         Rect::new(x + 24.0, y + 88.0, w - 48.0, 146.0),
         "Destinations",
     );
-    for (index, destination) in TRAVEL_DESTINATIONS.iter().enumerate() {
-        let row_y = y + 122.0 + index as f32 * 26.0;
+    let visible_rows: usize = 5;
+    let start = game
+        .travel_cursor
+        .saturating_sub(visible_rows.saturating_sub(1))
+        .min(game.travel_destinations.len().saturating_sub(visible_rows));
+    let end = (start + visible_rows).min(game.travel_destinations.len());
+    for (row, destination) in game.travel_destinations[start..end].iter().enumerate() {
+        let index = start + row;
+        let row_y = y + 122.0 + row as f32 * 26.0;
         if index == game.travel_cursor {
             draw_rectangle(
                 x + 36.0,
@@ -39,10 +42,8 @@ pub(crate) fn draw(game: &Game) {
         }
         draw_text(
             &format!(
-                "{}  {}  danger {}",
-                destination.name,
-                game.world.biome_at_tile(destination.pos).name(),
-                destination.min_level
+                "{}  Town  danger {}",
+                destination.name, destination.min_level
             ),
             x + 42.0,
             row_y,

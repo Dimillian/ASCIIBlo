@@ -1,6 +1,9 @@
 use macroquad::prelude::*;
 
-use crate::content::{Item, MonsterKind, MonsterRank, NpcKind};
+use crate::{
+    content::{Item, MonsterKind, MonsterRank, NpcKind},
+    world::{SettlementSite, SettlementTier},
+};
 
 pub struct Stats {
     pub level: i32,
@@ -353,6 +356,7 @@ pub struct Loot {
     pub bob: f32,
 }
 
+#[derive(Clone)]
 pub struct Npc {
     pub kind: NpcKind,
     pub pos: Vec2,
@@ -383,11 +387,22 @@ pub enum SkillBookFocus {
     Detail,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct TravelDestination {
-    pub name: &'static str,
+    pub name: String,
     pub pos: IVec2,
     pub min_level: i32,
+}
+
+#[derive(Clone, Copy)]
+pub struct DiscoveredSettlement {
+    pub site: SettlementSite,
+}
+
+impl DiscoveredSettlement {
+    pub fn tier(self) -> SettlementTier {
+        self.site.tier
+    }
 }
 
 pub struct FloatingText {

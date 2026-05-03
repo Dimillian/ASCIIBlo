@@ -101,6 +101,7 @@ impl Game {
                 );
             let pos = World::tile_center(tile);
             if !self.world.tile(tile).walkable
+                || self.world.is_safe_zone(tile)
                 || pos.distance(self.player.pos) < MONSTER_SPAWN_MIN_RADIUS
                 || pos.distance(self.player.pos) > MONSTER_LOCAL_RADIUS
                 || pack_center_can_be_seen_with_view(
@@ -129,6 +130,7 @@ impl Game {
             let pos = pack_center + vec2(angle.cos(), angle.sin()) * radius;
             let tile = World::world_to_tile(pos);
             if !self.world.tile(tile).walkable
+                || self.world.is_safe_zone(tile)
                 || self
                     .monsters
                     .iter()

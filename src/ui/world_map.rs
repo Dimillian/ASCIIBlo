@@ -1,10 +1,6 @@
 use macroquad::prelude::*;
 
-use crate::{
-    game::{Game, TRAVEL_DESTINATIONS},
-    render::with_alpha,
-    world::World,
-};
+use crate::{game::Game, render::with_alpha, world::World};
 
 use super::widgets::{draw_hotkey_hint, draw_modal_backdrop, draw_modal_frame};
 
@@ -85,17 +81,22 @@ fn draw_map_panel(game: &Game, rect: Rect) {
         );
     }
 
-    for destination in TRAVEL_DESTINATIONS {
-        if !game.known_tiles.contains(&destination.pos) {
+    for settlement in &game.discovered_settlements {
+        let destination = settlement.site;
+        if !game.known_tiles.contains(&destination.center) {
             continue;
         }
-        let screen = tile_to_screen(destination.pos, rect, center, zoom);
+        let screen = tile_to_screen(destination.center, rect, center, zoom);
         if rect.contains(screen) {
             draw_circle(
                 screen.x,
                 screen.y,
                 (zoom * 0.42).max(3.0),
-                Color::from_rgba(255, 224, 96, 255),
+                if settlement.tier() == crate::world::SettlementTier::Town {
+                    Color::from_rgba(255, 224, 96, 255)
+                } else {
+                    Color::from_rgba(180, 184, 190, 255)
+                },
             );
         }
     }

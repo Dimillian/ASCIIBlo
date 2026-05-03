@@ -37,11 +37,11 @@ The current slice includes:
 
 - Native windowed rendering with a smooth camera and layered UI
 - Real-time cooldown-based movement and combat
-- An infinite deterministic overworld with repeated irregular biome provinces, generated from coordinates around a safe handcrafted town at the origin
-- Visible biome levels, a framed minimap, a discovered-world map, and fast travel through the town wayfinder
+- An infinite deterministic overworld with larger irregular biome provinces, new wilderness regions, generated settlements, roads, landmarks, and scattered props
+- Visible biome levels, a framed minimap, a discovered-world map, and waypoint travel unlocked through discovered towns
 - Monsters with different tempos, attacks, level scaling, biome-specific encounter tables, and hover target readouts
 - Loot, item inspection, rarity, gear bonuses, inventory, stats, XP, levels, spendable stat points, use-based mastery, gold
-- Town NPCs for training, buying, selling, and travel
+- Villages and towns with visible floorplans, safe interiors, and tiered NPC services
 - Floating damage text, crits, particles, a compact combat feed, pickup feedback, skill bursts, and level-up fireworks
 - Dedicated modal UI for inventory, character progression, merchant buy/sell flows, trainer guidance, travel, and the world map
 

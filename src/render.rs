@@ -617,8 +617,22 @@ fn should_draw_tile_glyph(cached: CachedTileVisual, tile_pos: IVec2, world_seed:
         TileKind::Fungus => cluster > 8 || cached.accent_seed % 3 == 0,
         TileKind::Ash => cluster > 18 || cached.accent_seed % 4 == 0,
         TileKind::Ruins => cluster > 10 || cached.accent_seed % 3 == 0,
-        TileKind::Road => cached.accent_seed % 3 != 0,
-        TileKind::Wall | TileKind::Floor => true,
+        TileKind::Thorns => cluster > 12 || cached.accent_seed % 3 == 0,
+        TileKind::Mire => cluster > 16 || cached.accent_seed % 4 == 0,
+        TileKind::Road | TileKind::Bridge => cached.accent_seed % 3 != 0,
+        TileKind::Wall
+        | TileKind::Floor
+        | TileKind::Tree
+        | TileKind::DeadTree
+        | TileKind::Rock
+        | TileKind::MushroomCluster
+        | TileKind::Fence
+        | TileKind::Shrine
+        | TileKind::Well
+        | TileKind::Campfire
+        | TileKind::Grave
+        | TileKind::StandingStone
+        | TileKind::Cart => true,
     }
 }
 

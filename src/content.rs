@@ -845,6 +845,58 @@ const OLD_RUINS_ENCOUNTERS: [EncounterWeight; 6] = [
         weight: 6,
     },
 ];
+const THORNWOOD_ENCOUNTERS: [EncounterWeight; 6] = [
+    EncounterWeight {
+        kind: MonsterKind::Hound,
+        weight: 28,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Beetle,
+        weight: 22,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Imp,
+        weight: 18,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Brute,
+        weight: 14,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Wisp,
+        weight: 10,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Revenant,
+        weight: 8,
+    },
+];
+const MISTFEN_ENCOUNTERS: [EncounterWeight; 6] = [
+    EncounterWeight {
+        kind: MonsterKind::Slime,
+        weight: 28,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Wisp,
+        weight: 24,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Beetle,
+        weight: 18,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Revenant,
+        weight: 14,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Hound,
+        weight: 10,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Imp,
+        weight: 6,
+    },
+];
 
 fn encounter_table(biome: Biome) -> &'static [EncounterWeight] {
     match biome {
@@ -852,6 +904,8 @@ fn encounter_table(biome: Biome) -> &'static [EncounterWeight] {
         Biome::FungalGrove => &FUNGAL_GROVE_ENCOUNTERS,
         Biome::Ashfield => &ASHFIELD_ENCOUNTERS,
         Biome::OldRuins => &OLD_RUINS_ENCOUNTERS,
+        Biome::Thornwood => &THORNWOOD_ENCOUNTERS,
+        Biome::Mistfen => &MISTFEN_ENCOUNTERS,
     }
 }
 

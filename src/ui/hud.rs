@@ -80,7 +80,7 @@ pub(crate) fn draw(game: &Game) {
     draw_text(
         &format!(
             "{}  level {}",
-            game.world.biome_name(game.player.pos),
+            game.world.region_name(game.player.pos),
             game.world.biome_level(game.player.pos)
         ),
         controls_x,
@@ -313,7 +313,7 @@ fn draw_minimap(game: &Game) {
     draw_text(
         &format!(
             "{}  L{}",
-            game.world.biome_name(game.player.pos),
+            game.world.region_name(game.player.pos),
             game.world.biome_level(game.player.pos)
         ),
         x + 12.0,

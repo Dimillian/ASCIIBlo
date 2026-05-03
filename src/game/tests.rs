@@ -22,6 +22,19 @@ fn test_monster(kind: MonsterKind, pos: Vec2) -> Monster {
     }
 }
 
+fn discover_towns(game: &mut Game, count: usize) {
+    let sites = game.world.settlements_near_tile(ivec2(0, 0), 1_200);
+    for site in sites
+        .into_iter()
+        .filter(|site| site.tier == crate::world::SettlementTier::Town)
+    {
+        game.reveal_around_tile(site.center, 1);
+        if game.travel_destinations.len() >= count {
+            break;
+        }
+    }
+}
+
 #[test]
 fn leveling_grants_only_stat_points() {
     let mut game = Game::new(1);
@@ -50,13 +63,40 @@ fn leveling_grants_only_stat_points() {
 
 #[test]
 fn travel_destinations_reach_progressively_harder_biomes() {
-    let world = World::new(1);
-    let levels: Vec<i32> = TRAVEL_DESTINATIONS
+    let mut game = Game::new(1);
+    discover_towns(&mut game, 5);
+    let levels: Vec<i32> = game
+        .travel_destinations
         .iter()
-        .map(|destination| world.biome_level(World::tile_center(destination.pos)))
+        .map(|destination| destination.min_level)
         .collect();
 
-    assert_eq!(levels, vec![0, 1, 2, 3, 4]);
+    assert!(levels.len() >= 5);
+    assert!(levels.windows(2).all(|pair| pair[0] <= pair[1]));
+    assert_eq!(levels[0], 0);
+}
+
+#[test]
+fn towns_unlock_waypoints_while_villages_do_not() {
+    let mut game = Game::new(9);
+    let sites = game.world.settlements_near_tile(ivec2(0, 0), 1_200);
+    let town = sites
+        .iter()
+        .copied()
+        .find(|site| !site.is_origin() && site.tier == crate::world::SettlementTier::Town)
+        .unwrap();
+    let village = sites
+        .iter()
+        .copied()
+        .find(|site| site.tier == crate::world::SettlementTier::Village)
+        .unwrap();
+
+    let initial_destinations = game.travel_destinations.len();
+    game.reveal_around_tile(village.center, 1);
+    assert_eq!(game.travel_destinations.len(), initial_destinations);
+
+    game.reveal_around_tile(town.center, 1);
+    assert_eq!(game.travel_destinations.len(), initial_destinations + 1);
 }
 
 #[test]
@@ -64,6 +104,36 @@ fn new_game_starts_in_town() {
     let game = Game::new(1);
     assert_eq!(game.world.biome_level(game.player.pos), 0);
     assert!(!game.known_tiles.is_empty());
+}
+
+#[test]
+fn shrines_and_wells_restore_once() {
+    let mut game = Game::new(13);
+    let landmark = (-500..=500)
+        .step_by(7)
+        .flat_map(|y| (-500..=500).step_by(7).map(move |x| ivec2(x, y)))
+        .find_map(|tile| {
+            let landmark = game.world.landmark_at_tile(tile)?;
+            matches!(
+                landmark.kind,
+                crate::world::LandmarkKind::Shrine | crate::world::LandmarkKind::Well
+            )
+            .then_some(landmark)
+        })
+        .unwrap();
+    game.player.pos = World::tile_center(landmark.center);
+    game.player.hp = 1.0;
+    game.player.mana = 0.0;
+    game.interact_with_nearby_world_entity();
+    assert!(game.used_landmarks.contains(&landmark.id));
+    match landmark.kind {
+        crate::world::LandmarkKind::Shrine => assert_eq!(game.player.mana, game.player.max_mana()),
+        crate::world::LandmarkKind::Well => assert_eq!(game.player.hp, game.player.max_hp()),
+        _ => unreachable!(),
+    }
+    let log_len = game.log.len();
+    game.interact_with_nearby_world_entity();
+    assert_eq!(game.log.len(), log_len + 1);
 }
 
 #[test]
@@ -364,6 +434,7 @@ fn gameplay_smoke_flow_reaches_combat_loot_shop_and_travel() {
     assert!(game.player.inventory.len() >= 2);
 
     game.ui_mode = UiMode::None;
+    discover_towns(&mut game, 5);
     game.player.pos = game
         .npcs
         .iter()
@@ -372,10 +443,13 @@ fn gameplay_smoke_flow_reaches_combat_loot_shop_and_travel() {
         .pos;
     game.interact_with_nearby_npc();
     assert_eq!(game.ui_mode, UiMode::Travel);
-    game.travel_cursor = 4;
+    game.travel_cursor = game.travel_destinations.len() - 1;
     game.input.inventory_equip_pressed = true;
     game.update_travel_controls();
-    assert_eq!(game.world.biome_level(game.player.pos), 4);
+    assert!(
+        game.world.biome_level(game.player.pos)
+            >= game.travel_destinations.last().unwrap().min_level
+    );
 }
 
 #[test]
@@ -869,6 +943,7 @@ fn every_ui_window_supports_basic_navigation() {
         .pos;
     game.interact_with_nearby_npc();
     assert_eq!(game.ui_mode, UiMode::Travel);
+    discover_towns(&mut game, 2);
     game.input = InputState::default();
     game.input.inventory_down_pressed = true;
     game.fixed_update(FIXED_DT);

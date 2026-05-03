@@ -13,7 +13,7 @@ use macroquad::prelude::*;
 
 use crate::{
     content::{Item, NpcKind, merchant_stock, starter_items},
-    world::{TILE, World},
+    world::{SettlementTier, TILE, TOWN_RADIUS, World},
 };
 
 use input::InputState;
@@ -42,6 +42,9 @@ pub struct Game {
     pub player: Player,
     pub monsters: Vec<Monster>,
     pub npcs: Vec<Npc>,
+    pub discovered_settlements: Vec<DiscoveredSettlement>,
+    pub travel_destinations: Vec<TravelDestination>,
+    pub used_landmarks: HashSet<u64>,
     pub loot: Vec<Loot>,
     pub floating: Vec<FloatingText>,
     pub particles: Vec<Particle>,
@@ -132,20 +135,10 @@ impl Game {
                 },
             },
             monsters: Vec::new(),
-            npcs: vec![
-                Npc {
-                    kind: NpcKind::Merchant,
-                    pos: World::tile_center(ivec2(-5, 0)),
-                },
-                Npc {
-                    kind: NpcKind::Trainer,
-                    pos: World::tile_center(ivec2(0, -5)),
-                },
-                Npc {
-                    kind: NpcKind::Wayfinder,
-                    pos: World::tile_center(ivec2(5, 0)),
-                },
-            ],
+            npcs: Vec::new(),
+            discovered_settlements: Vec::new(),
+            travel_destinations: Vec::new(),
+            used_landmarks: HashSet::new(),
             loot: Vec::new(),
             floating: Vec::new(),
             particles: Vec::new(),
@@ -184,6 +177,7 @@ impl Game {
             quit: false,
         };
         game.reveal_around_tile(World::world_to_tile(game.player.pos), EXPLORATION_RADIUS);
+        game.sync_local_npcs();
         game.spawn_monster_packs(MONSTER_LOCAL_PACK_TARGET);
         game
     }
@@ -269,7 +263,7 @@ impl Game {
         }
 
         if self.input.interact_pressed {
-            self.interact_with_nearby_npc();
+            self.interact_with_nearby_world_entity();
         }
         if self.ui_mode != UiMode::None {
             self.clear_edge_inputs();
@@ -285,6 +279,7 @@ impl Game {
 
         self.update_player_movement(dt);
         self.reveal_around_tile(World::world_to_tile(self.player.pos), EXPLORATION_RADIUS);
+        self.sync_local_npcs();
         if self.input.attack_pressed {
             self.basic_attack();
         }
@@ -385,6 +380,56 @@ impl Game {
                 }
             }
         }
+        self.discover_settlements_near(center, radius + TOWN_RADIUS + 2);
+    }
+
+    fn discover_settlements_near(&mut self, center: IVec2, radius: i32) {
+        for site in self.world.settlements_near_tile(center, radius) {
+            if !self
+                .discovered_settlements
+                .iter()
+                .any(|known| known.site.id == site.id)
+            {
+                self.discovered_settlements
+                    .push(DiscoveredSettlement { site });
+                if site.tier == SettlementTier::Town {
+                    self.travel_destinations.push(TravelDestination {
+                        name: site.name(),
+                        pos: site.center,
+                        min_level: self.world.biome_level_at_tile(site.center),
+                    });
+                    self.travel_destinations
+                        .sort_by_key(|destination| destination.min_level);
+                }
+            }
+        }
+    }
+
+    fn sync_local_npcs(&mut self) {
+        let player_tile = World::world_to_tile(self.player.pos);
+        let mut npcs = Vec::new();
+        for site in self.world.settlements_near_tile(player_tile, 42) {
+            if site.tier == SettlementTier::Town || site.is_origin() {
+                npcs.push(Npc {
+                    kind: NpcKind::Merchant,
+                    pos: World::tile_center(site.center + ivec2(-5, 0)),
+                });
+                npcs.push(Npc {
+                    kind: NpcKind::Trainer,
+                    pos: World::tile_center(site.center + ivec2(0, -5)),
+                });
+                npcs.push(Npc {
+                    kind: NpcKind::Wayfinder,
+                    pos: World::tile_center(site.center + ivec2(5, 0)),
+                });
+            } else {
+                npcs.push(Npc {
+                    kind: NpcKind::Merchant,
+                    pos: World::tile_center(site.center + ivec2(-4, 0)),
+                });
+            }
+        }
+        self.npcs = npcs;
     }
 
     fn update_player_movement(&mut self, dt: f32) {
@@ -427,34 +472,6 @@ impl Game {
 pub fn combat_feed_rect() -> Rect {
     Rect::new(18.0, screen_height() - 320.0, 420.0, 250.0)
 }
-
-pub const TRAVEL_DESTINATIONS: [TravelDestination; 5] = [
-    TravelDestination {
-        name: "Ember Town",
-        pos: IVec2::new(0, 0),
-        min_level: 0,
-    },
-    TravelDestination {
-        name: "North Road",
-        pos: IVec2::new(0, -18),
-        min_level: 1,
-    },
-    TravelDestination {
-        name: "East March",
-        pos: IVec2::new(30, 0),
-        min_level: 2,
-    },
-    TravelDestination {
-        name: "South Reach",
-        pos: IVec2::new(0, 48),
-        min_level: 3,
-    },
-    TravelDestination {
-        name: "West Verge",
-        pos: IVec2::new(-72, 0),
-        min_level: 4,
-    },
-];
 
 #[cfg(test)]
 mod tests;
