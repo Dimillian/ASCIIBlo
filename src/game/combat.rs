@@ -304,9 +304,10 @@ impl Game {
     }
 
     pub(super) fn on_monster_killed(&mut self, monster: Monster) {
+        self.on_quest_monster_killed(&monster);
         let xp = monster_xp(monster.kind, monster.level, monster.rank);
         let (gold_min, gold_max) = monster.rank.gold_roll_bounds();
-        self.sim.player.stats.xp += xp;
+        self.grant_player_xp(xp);
         self.sim.player.stats.gold += self.runtime.rng.random_range(gold_min..=gold_max);
         self.emit(GameplayEvent::MonsterKilled {
             pos: monster.pos,
@@ -325,31 +326,6 @@ impl Game {
                 item,
                 bob: self.runtime.rng.random_range(0.0..10.0),
             });
-        }
-        while self.sim.player.stats.xp >= self.sim.player.stats.next_xp {
-            self.sim.player.stats.xp -= self.sim.player.stats.next_xp;
-            self.sim.player.stats.level += 1;
-            self.sim.player.stats.next_xp = (self.sim.player.stats.next_xp as f32 * 1.35) as i32;
-            self.sim.player.stats.strength += 1;
-            self.sim.player.stats.agility += 1;
-            self.sim.player.stats.vitality += 1;
-            self.sim.player.stats.unspent_stat_points += 3;
-            self.sim.player.hp = self.sim.player.max_hp();
-            self.sim.player.mana = self.sim.player.max_mana();
-            self.fx.pulses.push(Pulse {
-                pos: self.sim.player.pos,
-                radius: 22.0,
-                ttl: 0.9,
-                color: Color::from_rgba(255, 224, 96, 255),
-            });
-            self.emit(GameplayEvent::PlayerLeveled {
-                pos: self.sim.player.pos,
-                level: self.sim.player.stats.level,
-            });
-            self.log(format!(
-                "Level {}! Everything hums louder.",
-                self.sim.player.stats.level
-            ));
         }
     }
 

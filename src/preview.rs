@@ -1,13 +1,14 @@
-use std::{env, path::PathBuf};
+use std::path::PathBuf;
 
 use macroquad::prelude::{Color, Vec2, ivec2};
 
 use crate::{
     content::{Item, Rarity, Slot},
     game::{
-        AbilityKind, DisciplineKind, Game, Loot, Monster, Notification, Projectile, Pulse, ShopTab,
-        SkillBookFocus, SkillXpToast, UiMode,
+        AbilityKind, DisciplineKind, Game, Loot, Monster, Notification, Projectile, Pulse, Quest,
+        QuestKind, QuestReward, QuestStage, ShopTab, SkillBookFocus, SkillXpToast, UiMode,
     },
+    world::{SettlementSite, SettlementTier},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,10 +24,11 @@ pub enum PreviewMode {
     ShopSell,
     Trainer,
     Travel,
+    Quest,
 }
 
 impl PreviewMode {
-    pub const ALL: [PreviewMode; 11] = [
+    pub const ALL: [PreviewMode; 12] = [
         PreviewMode::Gameplay,
         PreviewMode::Lighting,
         PreviewMode::Pickup,
@@ -38,6 +40,7 @@ impl PreviewMode {
         PreviewMode::ShopSell,
         PreviewMode::Trainer,
         PreviewMode::Travel,
+        PreviewMode::Quest,
     ];
 
     pub fn slug(self) -> &'static str {
@@ -53,6 +56,7 @@ impl PreviewMode {
             PreviewMode::ShopSell => "shop-sell",
             PreviewMode::Trainer => "trainer",
             PreviewMode::Travel => "travel",
+            PreviewMode::Quest => "quest",
         }
     }
 
@@ -69,6 +73,7 @@ impl PreviewMode {
             "shop-sell" => Some(PreviewMode::ShopSell),
             "trainer" => Some(PreviewMode::Trainer),
             "travel" => Some(PreviewMode::Travel),
+            "quest" => Some(PreviewMode::Quest),
             _ => None,
         }
     }
@@ -92,6 +97,8 @@ impl PreviewMode {
         game.ui.mode = UiMode::None;
         game.ui.shop_tab = ShopTab::Buy;
         game.sim.loot.clear();
+        game.sim.quest_items.clear();
+        game.sim.active_quest = None;
         game.fx.floating.clear();
         game.fx.particles.clear();
         game.fx.pulses.clear();
@@ -140,6 +147,7 @@ impl PreviewMode {
                 game.sim.monsters.push(Monster {
                     kind: crate::content::MonsterKind::Brute,
                     rank: crate::content::MonsterRank::Elite,
+                    quest_id: None,
                     pack_id: 0,
                     pack_center: game.sim.player.pos + Vec2::new(42.0, 0.0),
                     pos: game.sim.player.pos + Vec2::new(42.0, 0.0),
@@ -260,6 +268,35 @@ impl PreviewMode {
                 reveal_preview_towns(game, 5);
                 game.ui.mode = UiMode::Travel;
             }
+            PreviewMode::Quest => {
+                game.sim.active_quest = Some(Quest {
+                    id: 99,
+                    kind: QuestKind::RecoverItems,
+                    signature: crate::game::QuestSignature::RecoverItems { landmark_id: 99 },
+                    stage: QuestStage::Active,
+                    giver: SettlementSite {
+                        id: 0,
+                        center: ivec2(0, 0),
+                        tier: SettlementTier::Town,
+                    },
+                    title: "Recover cart ledgers".into(),
+                    objective: "Recover 3 cart ledgers at the abandoned cart beyond Briarwatch"
+                        .into(),
+                    target_pos: game.sim.player.pos + Vec2::new(180.0, -64.0),
+                    progress: 1,
+                    goal: 3,
+                    reward: QuestReward {
+                        gold: 32,
+                        xp: 28,
+                        item_chance: 0.16,
+                    },
+                });
+                game.fx.skill_xp_toasts.push(SkillXpToast {
+                    kind: DisciplineKind::Magic,
+                    amount: 14,
+                    ttl: 2.4,
+                });
+            }
         }
     }
 }
@@ -284,11 +321,7 @@ pub enum PreviewRequest {
 }
 
 impl PreviewRequest {
-    pub fn from_env() -> Self {
-        Self::from_args(env::args().skip(1))
-    }
-
-    fn from_args<I>(mut args: I) -> Self
+    pub(crate) fn from_args<I>(mut args: I) -> Self
     where
         I: Iterator<Item = String>,
     {
@@ -312,6 +345,10 @@ impl PreviewRequest {
             (Some(mode), Some(path)) => PreviewRequest::Single { mode, path },
             _ => PreviewRequest::None,
         }
+    }
+
+    pub fn is_preview(&self) -> bool {
+        !matches!(self, PreviewRequest::None)
     }
 }
 

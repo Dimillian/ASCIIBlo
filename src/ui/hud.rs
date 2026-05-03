@@ -142,6 +142,7 @@ pub(crate) fn draw(game: &Game) {
     draw_log(game);
     draw_skill_feedback(game);
     draw_minimap(game);
+    draw_quest_objective(game);
     draw_hovered_monster_tooltip(game);
     draw_nearest_loot_tooltip(game);
 }
@@ -218,7 +219,7 @@ fn draw_cooldown_badge(label: &str, ability: AbilityKind, cooldown: f32, pos: Ve
 fn draw_skill_feedback(game: &Game) {
     let panel_w = 260.0;
     let x = screen_width() - panel_w - 18.0;
-    let mut y = 300.0;
+    let mut y = quest_panel_bottom(game).map_or(300.0, |bottom| bottom + 12.0);
 
     for notification in game.fx.notifications.iter().rev().take(3) {
         draw_feedback_row(x, y, panel_w, &notification.text, notification.color, 1.0);
@@ -417,6 +418,52 @@ fn draw_minimap(game: &Game) {
         4.0,
         WHITE,
     );
+}
+
+fn draw_quest_objective(game: &Game) {
+    let Some((title, objective, progress)) = game.active_quest_objective() else {
+        return;
+    };
+    let panel_size = vec2(220.0, 114.0);
+    let x = screen_width() - panel_size.x - 18.0;
+    let y = 292.0;
+    draw_rectangle(
+        x,
+        y,
+        panel_size.x,
+        panel_size.y,
+        with_alpha(Color::from_rgba(12, 14, 18, 255), 0.92),
+    );
+    draw_rectangle_lines(
+        x,
+        y,
+        panel_size.x,
+        panel_size.y,
+        2.0,
+        with_alpha(Color::from_rgba(255, 224, 96, 255), 0.72),
+    );
+    draw_text(
+        title,
+        x + 12.0,
+        y + 22.0,
+        17.0,
+        Color::from_rgba(255, 224, 96, 255),
+    );
+    let lines = wrap_text(&objective, panel_size.x - 24.0, 16.0, 3);
+    for (index, line) in lines.iter().enumerate() {
+        draw_text(line, x + 12.0, y + 44.0 + index as f32 * 18.0, 16.0, WHITE);
+    }
+    draw_text(
+        &progress,
+        x + 12.0,
+        y + panel_size.y - 12.0,
+        15.0,
+        Color::from_rgba(170, 238, 214, 255),
+    );
+}
+
+fn quest_panel_bottom(game: &Game) -> Option<f32> {
+    game.active_quest_objective().map(|_| 292.0 + 114.0)
 }
 
 fn draw_hovered_monster_tooltip(game: &Game) {

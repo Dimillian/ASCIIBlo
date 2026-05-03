@@ -280,9 +280,11 @@ impl Player {
     }
 }
 
+#[derive(Clone)]
 pub struct Monster {
     pub kind: MonsterKind,
     pub rank: MonsterRank,
+    pub quest_id: Option<u64>,
     pub pack_id: u64,
     pub pack_center: Vec2,
     pub pos: Vec2,
@@ -312,7 +314,96 @@ pub struct Loot {
 #[derive(Clone)]
 pub struct Npc {
     pub kind: NpcKind,
+    pub name: String,
+    pub quest_id: Option<u64>,
     pub pos: Vec2,
+}
+
+pub struct QuestItem {
+    pub quest_id: u64,
+    pub pos: Vec2,
+    pub name: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum QuestKind {
+    KillPack,
+    BountyBoss,
+    MeetNpc,
+    RecoverItems,
+}
+
+impl QuestKind {
+    pub const ALL: [Self; 4] = [
+        Self::KillPack,
+        Self::BountyBoss,
+        Self::MeetNpc,
+        Self::RecoverItems,
+    ];
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum QuestStage {
+    Active,
+    ReadyToTurnIn,
+}
+
+#[derive(Clone)]
+pub struct QuestReward {
+    pub gold: i32,
+    pub xp: i32,
+    pub item_chance: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum QuestSignature {
+    KillPack {
+        tile_x: i32,
+        tile_y: i32,
+        kind: MonsterKind,
+    },
+    BountyBoss {
+        tile_x: i32,
+        tile_y: i32,
+        kind: MonsterKind,
+    },
+    MeetNpc {
+        town_id: u64,
+    },
+    RecoverItems {
+        landmark_id: u64,
+    },
+}
+
+#[derive(Clone)]
+pub struct Quest {
+    pub id: u64,
+    pub kind: QuestKind,
+    pub signature: QuestSignature,
+    pub stage: QuestStage,
+    pub giver: SettlementSite,
+    pub title: String,
+    pub objective: String,
+    pub target_pos: Vec2,
+    pub progress: usize,
+    pub goal: usize,
+    pub reward: QuestReward,
+}
+
+impl Quest {
+    pub fn progress_text(&self) -> String {
+        match self.kind {
+            QuestKind::MeetNpc => format!("{}/1 met", self.progress),
+            QuestKind::KillPack | QuestKind::BountyBoss => {
+                format!("{}/{} slain", self.progress, self.goal)
+            }
+            QuestKind::RecoverItems => format!("{}/{} recovered", self.progress, self.goal),
+        }
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.stage == QuestStage::ReadyToTurnIn
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

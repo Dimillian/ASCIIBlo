@@ -1,4 +1,6 @@
-use super::{AbilityKind, DisciplineKind, Game, events::GameplayEvent};
+use macroquad::prelude::Color;
+
+use super::{AbilityKind, DisciplineKind, Game, Pulse, events::GameplayEvent};
 
 const AGILITY_XP_DISTANCE: f32 = 144.0;
 pub(super) const SKILL_XP_TOAST_TTL: f32 = 2.4;
@@ -9,6 +11,38 @@ pub(super) fn discipline_next_xp(level: i32) -> i32 {
 }
 
 impl Game {
+    pub(super) fn grant_player_xp(&mut self, amount: i32) {
+        if amount <= 0 {
+            return;
+        }
+        self.sim.player.stats.xp += amount;
+        while self.sim.player.stats.xp >= self.sim.player.stats.next_xp {
+            self.sim.player.stats.xp -= self.sim.player.stats.next_xp;
+            self.sim.player.stats.level += 1;
+            self.sim.player.stats.next_xp = (self.sim.player.stats.next_xp as f32 * 1.35) as i32;
+            self.sim.player.stats.strength += 1;
+            self.sim.player.stats.agility += 1;
+            self.sim.player.stats.vitality += 1;
+            self.sim.player.stats.unspent_stat_points += 3;
+            self.sim.player.hp = self.sim.player.max_hp();
+            self.sim.player.mana = self.sim.player.max_mana();
+            self.fx.pulses.push(Pulse {
+                pos: self.sim.player.pos,
+                radius: 22.0,
+                ttl: 0.9,
+                color: Color::from_rgba(255, 224, 96, 255),
+            });
+            self.emit(GameplayEvent::PlayerLeveled {
+                pos: self.sim.player.pos,
+                level: self.sim.player.stats.level,
+            });
+            self.log(format!(
+                "Level {}! Everything hums louder.",
+                self.sim.player.stats.level
+            ));
+        }
+    }
+
     pub(super) fn award_discipline_xp(&mut self, kind: DisciplineKind, amount: i32) {
         if amount <= 0 {
             return;

@@ -51,7 +51,9 @@ impl Renderer {
         let camera = self.camera + shake;
         self.draw_world(game, camera);
         self.draw_loot(game, camera);
+        self.draw_quest_items(game, camera);
         self.draw_monsters(game, camera);
+        self.draw_quest_boards(game, camera);
         self.draw_npcs(game, camera);
         self.draw_player(game, camera);
         self.draw_effects(game, camera);
@@ -289,6 +291,17 @@ impl Renderer {
         }
     }
 
+    fn draw_quest_items(&self, game: &Game, camera: Vec2) {
+        for item in &game.sim.quest_items {
+            let screen = world_to_screen(item.pos, camera);
+            draw_glow(screen, 8.0, Color::from_rgba(170, 238, 214, 255), 0.72);
+            draw_text_centered("*", screen, 24.0, Color::from_rgba(170, 238, 214, 255));
+            if item.pos.distance(game.sim.player.pos) <= 42.0 && game.ui.mode == UiMode::None {
+                ui::draw_world_hotkey_hint("E", "recover", screen + vec2(-32.0, -40.0));
+            }
+        }
+    }
+
     fn draw_monsters(&self, game: &Game, camera: Vec2) {
         for monster in &game.sim.monsters {
             self.draw_monster(monster, camera);
@@ -456,6 +469,24 @@ impl Renderer {
         }
     }
 
+    fn draw_quest_boards(&self, game: &Game, camera: Vec2) {
+        for site in game.nearby_quest_boards() {
+            let pos = Game::quest_board_pos(site);
+            let screen = world_to_screen(pos, camera);
+            draw_circle(screen.x, screen.y + 6.0, 10.0, with_alpha(BLACK, 0.28));
+            draw_circle(
+                screen.x,
+                screen.y,
+                14.0,
+                with_alpha(Color::from_rgba(255, 224, 96, 255), 0.14),
+            );
+            draw_text_centered("!", screen, 26.0, Color::from_rgba(255, 224, 96, 255));
+            if pos.distance(game.sim.player.pos) <= 42.0 && game.ui.mode == UiMode::None {
+                ui::draw_world_hotkey_hint("F", "board", screen + vec2(-30.0, -40.0));
+            }
+        }
+    }
+
     fn draw_player(&self, game: &Game, camera: Vec2) {
         let screen = world_to_screen(game.sim.player.pos, camera);
         draw_circle(screen.x, screen.y + 7.0, 12.0, with_alpha(BLACK, 0.32));
@@ -470,6 +501,27 @@ impl Renderer {
             2.0,
             with_alpha(WHITE, 0.6),
         );
+        if let Some(target) = game.quest_navigation_target() {
+            let direction = (target - game.sim.player.pos).normalize_or_zero();
+            if direction.length_squared() > 0.0 && target.distance(game.sim.player.pos) > 30.0 {
+                let tip = screen + direction * 38.0;
+                let side = vec2(-direction.y, direction.x) * 7.0;
+                draw_triangle(
+                    tip,
+                    tip - direction * 15.0 + side,
+                    tip - direction * 15.0 - side,
+                    Color::from_rgba(255, 224, 96, 255),
+                );
+                draw_line(
+                    screen.x + direction.x * 22.0,
+                    screen.y + direction.y * 22.0,
+                    tip.x - direction.x * 8.0,
+                    tip.y - direction.y * 8.0,
+                    2.0,
+                    with_alpha(Color::from_rgba(255, 224, 96, 255), 0.78),
+                );
+            }
+        }
     }
 
     fn draw_effects(&self, game: &Game, camera: Vec2) {

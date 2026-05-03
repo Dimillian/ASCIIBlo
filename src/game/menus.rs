@@ -230,6 +230,9 @@ impl Game {
     }
 
     pub(super) fn interact_with_nearby_world_entity(&mut self) {
+        if self.interact_with_nearby_quest_board() {
+            return;
+        }
         if self.interact_with_nearby_npc() {
             return;
         }
@@ -237,20 +240,29 @@ impl Game {
     }
 
     pub(super) fn interact_with_nearby_npc(&mut self) -> bool {
-        let Some(kind) = self
+        let Some(npc) = self
             .sim
             .npcs
             .iter()
-            .find(|npc| npc.pos.distance(self.sim.player.pos) <= 42.0)
-            .map(|npc| npc.kind)
+            .filter(|npc| npc.pos.distance(self.sim.player.pos) <= 42.0)
+            .min_by(|a, b| {
+                a.pos
+                    .distance(self.sim.player.pos)
+                    .total_cmp(&b.pos.distance(self.sim.player.pos))
+            })
+            .cloned()
         else {
             return false;
         };
-        self.log(format!("{}: {}", kind.name(), kind.greeting()));
-        self.ui.mode = match kind {
+        if self.interact_with_quest_contact(&npc) {
+            return true;
+        }
+        self.log(format!("{}: {}", npc.name, npc.kind.greeting()));
+        self.ui.mode = match npc.kind {
             NpcKind::Merchant => UiMode::Merchant,
             NpcKind::Trainer => UiMode::Trainer,
             NpcKind::Wayfinder => UiMode::Travel,
+            NpcKind::QuestContact => UiMode::None,
         };
         true
     }

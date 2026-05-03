@@ -84,7 +84,7 @@ struct Affix {
     value: i32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum MonsterKind {
     Imp,
     Slime,
@@ -108,6 +108,7 @@ pub enum NpcKind {
     Merchant,
     Trainer,
     Wayfinder,
+    QuestContact,
 }
 
 impl NpcKind {
@@ -116,6 +117,7 @@ impl NpcKind {
             NpcKind::Merchant => '$',
             NpcKind::Trainer => '!',
             NpcKind::Wayfinder => '?',
+            NpcKind::QuestContact => '&',
         }
     }
 
@@ -124,6 +126,7 @@ impl NpcKind {
             NpcKind::Merchant => Color::from_rgba(255, 214, 108, 255),
             NpcKind::Trainer => Color::from_rgba(255, 132, 120, 255),
             NpcKind::Wayfinder => Color::from_rgba(128, 214, 255, 255),
+            NpcKind::QuestContact => Color::from_rgba(170, 238, 214, 255),
         }
     }
 
@@ -132,6 +135,7 @@ impl NpcKind {
             NpcKind::Merchant => "Mira the Merchant",
             NpcKind::Trainer => "Oren the Trainer",
             NpcKind::Wayfinder => "Rill the Wayfinder",
+            NpcKind::QuestContact => "Traveler",
         }
     }
 
@@ -140,6 +144,7 @@ impl NpcKind {
             NpcKind::Merchant => "Steel, charms, and honest prices. Mostly honest.",
             NpcKind::Trainer => "Practice is what turns motion into mastery.",
             NpcKind::Wayfinder => "Roads remember where your boots have been.",
+            NpcKind::QuestContact => "You found me. The road was less kind than promised.",
         }
     }
 }

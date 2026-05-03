@@ -480,6 +480,25 @@ impl World {
         self.landmark_at_tile(Self::world_to_tile(pos))
     }
 
+    pub fn landmarks_near_tile(&self, center: IVec2, radius: i32) -> Vec<Landmark> {
+        let mut landmarks = Vec::new();
+        let min_cell = feature_cell(center - ivec2(radius, radius));
+        let max_cell = feature_cell(center + ivec2(radius, radius));
+        for y in min_cell.y - 1..=max_cell.y + 1 {
+            for x in min_cell.x - 1..=max_cell.x + 1 {
+                if let Some(landmark) = generated_landmark(ivec2(x, y), self.seed)
+                    && self.settlement_at_tile(landmark.center).is_none()
+                    && landmark.center.distance_squared(center) <= radius * radius
+                {
+                    landmarks.push(landmark);
+                }
+            }
+        }
+        landmarks.sort_by_key(|landmark| landmark.id);
+        landmarks.dedup_by_key(|landmark| landmark.id);
+        landmarks
+    }
+
     fn road_at_tile(&self, pos: IVec2) -> bool {
         if self.settlement_at_tile(pos).is_some() {
             return false;
@@ -596,6 +615,10 @@ impl World {
                 _ => None,
             },
             LandmarkKind::Graveyard => match (local.x, local.y) {
+                (0, 2) => Some(Tile {
+                    kind: TileKind::Road,
+                    walkable: true,
+                }),
                 (-2..=2, -2..=2) if local.x.abs() == 2 || local.y.abs() == 2 => Some(Tile {
                     kind: TileKind::Fence,
                     walkable: false,
@@ -1078,6 +1101,21 @@ mod tests {
             assert_eq!(world.biome_at_tile(pos), Biome::Meadow);
             assert_ne!(world.tile(pos).kind, TileKind::Mire);
         }
+    }
+
+    #[test]
+    fn graveyards_have_a_walkable_gate() {
+        let world = World::new(13);
+        let graveyard = (-500..=500)
+            .step_by(7)
+            .flat_map(|y| (-500..=500).step_by(7).map(move |x| ivec2(x, y)))
+            .find_map(|tile| {
+                let landmark = world.landmark_at_tile(tile)?;
+                (landmark.kind == LandmarkKind::Graveyard).then_some(landmark)
+            })
+            .unwrap();
+
+        assert!(world.tile(graveyard.center + ivec2(0, 2)).walkable);
     }
 
     #[test]

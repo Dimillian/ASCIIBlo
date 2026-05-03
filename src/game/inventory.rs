@@ -6,6 +6,9 @@ use super::{Game, Loot, events::GameplayEvent};
 
 impl Game {
     pub(super) fn pickup_loot(&mut self) {
+        if self.pickup_nearby_quest_item() {
+            return;
+        }
         let Some(index) = self
             .sim
             .loot

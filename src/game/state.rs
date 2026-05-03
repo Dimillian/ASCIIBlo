@@ -7,14 +7,18 @@ use crate::content::Item;
 
 use super::{
     DEFAULT_SPAWN_VISIBILITY_HALF_VIEW, DiscoveredSettlement, FloatingText, InputState, Loot,
-    MeteorStrike, Monster, Notification, Npc, Particle, Projectile, Pulse, ShopTab, SkillBookFocus,
-    SkillXpToast, SlashArc, TravelDestination, UiMode, WorldMapState,
+    MeteorStrike, Monster, Notification, Npc, Particle, Projectile, Pulse, Quest, QuestItem,
+    QuestSignature, ShopTab, SkillBookFocus, SkillXpToast, SlashArc, TravelDestination, UiMode,
+    WorldMapState,
 };
 
 pub struct SimulationState {
     pub player: super::Player,
     pub monsters: Vec<Monster>,
     pub npcs: Vec<Npc>,
+    pub active_quest: Option<Quest>,
+    pub quest_items: Vec<QuestItem>,
+    pub completed_quest_signatures: HashSet<QuestSignature>,
     pub discovered_settlements: Vec<DiscoveredSettlement>,
     pub travel_destinations: Vec<TravelDestination>,
     pub used_landmarks: HashSet<u64>,
@@ -57,6 +61,7 @@ pub struct RuntimeState {
     pub preview_hover_screen: Option<Vec2>,
     pub(super) spawn_visibility_half_view: Vec2,
     pub(super) next_monster_pack_id: u64,
+    pub(super) next_quest_id: u64,
     pub(super) rng: StdRng,
     pub(super) input: InputState,
     pub(super) quit: bool,
@@ -71,6 +76,7 @@ impl RuntimeState {
             preview_hover_screen: None,
             spawn_visibility_half_view: DEFAULT_SPAWN_VISIBILITY_HALF_VIEW,
             next_monster_pack_id: 0,
+            next_quest_id: 1,
             rng,
             input: InputState::default(),
             quit: false,
@@ -84,6 +90,9 @@ impl SimulationState {
             player,
             monsters: Vec::new(),
             npcs: Vec::new(),
+            active_quest: None,
+            quest_items: Vec::new(),
+            completed_quest_signatures: HashSet::new(),
             discovered_settlements: Vec::new(),
             travel_destinations: Vec::new(),
             used_landmarks: HashSet::new(),

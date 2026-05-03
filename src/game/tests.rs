@@ -10,6 +10,7 @@ fn test_monster(kind: MonsterKind, pos: Vec2) -> Monster {
     Monster {
         kind,
         rank: MonsterRank::Normal,
+        quest_id: None,
         pack_id: 0,
         pack_center: pos,
         pos,
@@ -38,6 +39,14 @@ fn discover_towns(game: &mut Game, count: usize) {
     }
 }
 
+fn origin_town(game: &Game) -> crate::world::SettlementSite {
+    game.world
+        .settlements_near_tile(ivec2(0, 0), 1)
+        .into_iter()
+        .find(|site| site.is_origin())
+        .unwrap()
+}
+
 #[test]
 fn leveling_grants_only_stat_points() {
     let mut game = Game::new(1);
@@ -46,6 +55,7 @@ fn leveling_grants_only_stat_points() {
     game.on_monster_killed(Monster {
         kind: MonsterKind::Imp,
         rank: MonsterRank::Normal,
+        quest_id: None,
         pack_id: 0,
         pack_center: game.sim.player.pos + vec2(40.0, 0.0),
         pos: game.sim.player.pos + vec2(40.0, 0.0),
@@ -108,6 +118,229 @@ fn new_game_starts_in_town() {
     let game = Game::new(1);
     assert_eq!(game.world.biome_level(game.sim.player.pos), 0);
     assert!(!game.sim.known_tiles.is_empty());
+}
+
+#[test]
+fn bounty_boards_generate_one_valid_active_quest_from_origin_and_later_towns() {
+    let mut game = Game::new(1);
+    let origin = origin_town(&game);
+    game.sim.player.pos = Game::quest_board_pos(origin);
+    assert!(game.interact_with_nearby_quest_board());
+    let quest = game.sim.active_quest.clone().unwrap();
+    assert!(quest.goal > 0);
+    let first_id = quest.id;
+    assert!(game.interact_with_nearby_quest_board());
+    assert_eq!(game.sim.active_quest.as_ref().unwrap().id, first_id);
+
+    let mut later_game = Game::new(1);
+    let later_town = later_game
+        .world
+        .settlements_near_tile(ivec2(0, 0), 1_200)
+        .into_iter()
+        .find(|site| !site.is_origin() && site.tier == crate::world::SettlementTier::Town)
+        .unwrap();
+    later_game.sim.player.pos = Game::quest_board_pos(later_town);
+    assert!(later_game.interact_with_nearby_quest_board());
+    assert!(later_game.sim.active_quest.is_some());
+}
+
+#[test]
+fn each_quest_archetype_spawns_concrete_targets() {
+    let mut kill_game = Game::new(2);
+    let giver = origin_town(&kill_game);
+    let kill = kill_game.generate_kill_pack_quest(giver).unwrap();
+    assert_eq!(kill.kind, QuestKind::KillPack);
+    assert_eq!(
+        kill_game
+            .sim
+            .monsters
+            .iter()
+            .filter(|monster| monster.quest_id == Some(kill.id))
+            .count(),
+        kill.goal
+    );
+
+    let mut bounty_game = Game::new(3);
+    let bounty = bounty_game
+        .generate_bounty_quest(origin_town(&bounty_game))
+        .unwrap();
+    assert_eq!(bounty.kind, QuestKind::BountyBoss);
+    assert!(bounty_game.sim.monsters.iter().any(|monster| {
+        monster.quest_id == Some(bounty.id) && monster.rank == MonsterRank::Boss
+    }));
+
+    let mut meet_game = Game::new(1);
+    let meet = meet_game
+        .generate_meet_npc_quest(origin_town(&meet_game))
+        .unwrap();
+    assert_eq!(meet.kind, QuestKind::MeetNpc);
+    assert!(meet_game.sim.npcs.iter().any(|npc| {
+        npc.quest_id == Some(meet.id) && npc.kind == crate::content::NpcKind::QuestContact
+    }));
+
+    let mut recover_game = Game::new(1);
+    let recover = recover_game
+        .generate_recovery_quest(origin_town(&recover_game))
+        .unwrap();
+    assert_eq!(recover.kind, QuestKind::RecoverItems);
+    assert_eq!(
+        recover_game
+            .sim
+            .quest_items
+            .iter()
+            .filter(|item| item.quest_id == recover.id)
+            .count(),
+        recover.goal
+    );
+    assert!(
+        recover_game
+            .sim
+            .quest_items
+            .iter()
+            .all(|item| { recover_game.world.walkable_at_world(item.pos) })
+    );
+}
+
+#[test]
+fn kill_and_bounty_quests_only_advance_from_tagged_targets() {
+    let mut kill_game = Game::new(2);
+    let kill = kill_game
+        .generate_kill_pack_quest(origin_town(&kill_game))
+        .unwrap();
+    kill_game.sim.active_quest = Some(kill.clone());
+    kill_game.on_monster_killed(test_monster(MonsterKind::Imp, kill.target_pos));
+    assert_eq!(kill_game.sim.active_quest.as_ref().unwrap().progress, 0);
+    for monster in kill_game
+        .sim
+        .monsters
+        .iter()
+        .filter(|monster| monster.quest_id == Some(kill.id))
+        .cloned()
+        .collect::<Vec<_>>()
+    {
+        kill_game.on_monster_killed(monster);
+    }
+    assert!(kill_game.sim.active_quest.as_ref().unwrap().is_ready());
+
+    let mut bounty_game = Game::new(3);
+    let bounty = bounty_game
+        .generate_bounty_quest(origin_town(&bounty_game))
+        .unwrap();
+    bounty_game.sim.active_quest = Some(bounty.clone());
+    let boss = bounty_game
+        .sim
+        .monsters
+        .iter()
+        .find(|monster| monster.quest_id == Some(bounty.id))
+        .unwrap()
+        .clone();
+    bounty_game.on_monster_killed(boss);
+    assert!(bounty_game.sim.active_quest.as_ref().unwrap().is_ready());
+}
+
+#[test]
+fn meet_and_recovery_quests_complete_through_their_dedicated_interactions() {
+    let mut meet_game = Game::new(1);
+    let meet = meet_game
+        .generate_meet_npc_quest(origin_town(&meet_game))
+        .unwrap();
+    meet_game.sim.active_quest = Some(meet.clone());
+    let npc = meet_game
+        .sim
+        .npcs
+        .iter()
+        .find(|npc| npc.quest_id == Some(meet.id))
+        .unwrap()
+        .clone();
+    assert!(meet_game.interact_with_quest_contact(&npc));
+    assert!(meet_game.sim.active_quest.as_ref().unwrap().is_ready());
+
+    let mut recover_game = Game::new(1);
+    let recover = recover_game
+        .generate_recovery_quest(origin_town(&recover_game))
+        .unwrap();
+    recover_game.sim.active_quest = Some(recover.clone());
+    let item_positions = recover_game
+        .sim
+        .quest_items
+        .iter()
+        .map(|item| item.pos)
+        .collect::<Vec<_>>();
+    for pos in item_positions {
+        recover_game.sim.player.pos = pos;
+        assert!(recover_game.pickup_nearby_quest_item());
+    }
+    assert!(recover_game.sim.active_quest.as_ref().unwrap().is_ready());
+}
+
+#[test]
+fn completed_quests_retarget_to_the_board_and_clean_up_on_turn_in() {
+    let mut game = Game::new(2);
+    let giver = origin_town(&game);
+    let quest = game.generate_kill_pack_quest(giver).unwrap();
+    game.sim.active_quest = Some(quest.clone());
+    let monsters = game
+        .sim
+        .monsters
+        .iter()
+        .filter(|monster| monster.quest_id == Some(quest.id))
+        .cloned()
+        .collect::<Vec<_>>();
+    for monster in monsters {
+        game.on_monster_killed(monster);
+    }
+    assert_eq!(
+        game.quest_navigation_target(),
+        Some(Game::quest_board_pos(giver))
+    );
+    let gold_before = game.sim.player.stats.gold;
+    let xp_before = game.sim.player.stats.xp;
+    let level_before = game.sim.player.stats.level;
+    game.sim.player.pos = Game::quest_board_pos(giver);
+    assert!(game.interact_with_nearby_quest_board());
+    assert!(game.sim.active_quest.is_none());
+    assert!(game.sim.player.stats.gold > gold_before);
+    assert!(game.sim.player.stats.level > level_before || game.sim.player.stats.xp > xp_before);
+    assert!(
+        game.sim
+            .monsters
+            .iter()
+            .all(|monster| monster.quest_id != Some(quest.id))
+    );
+}
+
+#[test]
+fn completed_quest_sources_are_not_reissued() {
+    let mut game = Game::new(1);
+    let giver = origin_town(&game);
+    let first = game.generate_recovery_quest(giver).unwrap();
+    let first_signature = first.signature;
+    game.sim.active_quest = Some(first.clone());
+    let item_positions = game
+        .sim
+        .quest_items
+        .iter()
+        .filter(|item| item.quest_id == first.id)
+        .map(|item| item.pos)
+        .collect::<Vec<_>>();
+    for pos in item_positions {
+        game.sim.player.pos = pos;
+        assert!(game.pickup_nearby_quest_item());
+    }
+    game.sim.player.pos = Game::quest_board_pos(giver);
+    assert!(game.interact_with_nearby_quest_board());
+    assert!(
+        game.sim
+            .completed_quest_signatures
+            .contains(&first_signature)
+    );
+
+    let second = game.generate_recovery_quest(giver);
+    assert!(
+        second
+            .as_ref()
+            .is_none_or(|quest| quest.signature != first_signature)
+    );
 }
 
 #[test]
@@ -306,6 +539,7 @@ fn hovered_monster_prefers_the_enemy_under_the_cursor() {
         Monster {
             kind: MonsterKind::Imp,
             rank: MonsterRank::Normal,
+            quest_id: None,
             pack_id: 0,
             pack_center: game.sim.player.pos + vec2(20.0, 0.0),
             pos: game.sim.player.pos + vec2(20.0, 0.0),
@@ -322,6 +556,7 @@ fn hovered_monster_prefers_the_enemy_under_the_cursor() {
         Monster {
             kind: MonsterKind::Brute,
             rank: MonsterRank::Normal,
+            quest_id: None,
             pack_id: 1,
             pack_center: game.sim.player.pos + vec2(24.0, 0.0),
             pos: game.sim.player.pos + vec2(24.0, 0.0),
@@ -399,6 +634,7 @@ fn gameplay_smoke_flow_reaches_combat_loot_shop_and_travel() {
     game.sim.monsters.push(Monster {
         kind: MonsterKind::Imp,
         rank: MonsterRank::Normal,
+        quest_id: None,
         pack_id: 0,
         pack_center: game.sim.player.pos + vec2(32.0, 0.0),
         pos: game.sim.player.pos + vec2(32.0, 0.0),
@@ -478,6 +714,7 @@ fn fireball_explodes_and_hits_nearby_monsters() {
         Monster {
             kind: MonsterKind::Imp,
             rank: MonsterRank::Normal,
+            quest_id: None,
             pack_id: 0,
             pack_center: game.sim.player.pos + vec2(34.0, 0.0),
             pos: game.sim.player.pos + vec2(34.0, 0.0),
@@ -494,6 +731,7 @@ fn fireball_explodes_and_hits_nearby_monsters() {
         Monster {
             kind: MonsterKind::Slime,
             rank: MonsterRank::Normal,
+            quest_id: None,
             pack_id: 1,
             pack_center: game.sim.player.pos + vec2(48.0, 10.0),
             pos: game.sim.player.pos + vec2(48.0, 10.0),
@@ -510,6 +748,7 @@ fn fireball_explodes_and_hits_nearby_monsters() {
         Monster {
             kind: MonsterKind::Brute,
             rank: MonsterRank::Normal,
+            quest_id: None,
             pack_id: 2,
             pack_center: game.sim.player.pos + vec2(120.0, 0.0),
             pos: game.sim.player.pos + vec2(120.0, 0.0),
@@ -557,6 +796,7 @@ fn hitting_monster_sets_flash_and_recoil() {
     game.sim.monsters = vec![Monster {
         kind: MonsterKind::Imp,
         rank: MonsterRank::Normal,
+        quest_id: None,
         pack_id: 0,
         pack_center: game.sim.player.pos + vec2(32.0, 0.0),
         pos: game.sim.player.pos + vec2(32.0, 0.0),
@@ -585,6 +825,7 @@ fn cleave_hits_front_arc_without_hitting_behind() {
         Monster {
             kind: MonsterKind::Imp,
             rank: MonsterRank::Normal,
+            quest_id: None,
             pack_id: 0,
             pack_center: game.sim.player.pos + vec2(36.0, 0.0),
             pos: game.sim.player.pos + vec2(36.0, 0.0),
@@ -601,6 +842,7 @@ fn cleave_hits_front_arc_without_hitting_behind() {
         Monster {
             kind: MonsterKind::Slime,
             rank: MonsterRank::Normal,
+            quest_id: None,
             pack_id: 1,
             pack_center: game.sim.player.pos + vec2(-36.0, 0.0),
             pos: game.sim.player.pos + vec2(-36.0, 0.0),
@@ -892,6 +1134,7 @@ fn armor_mastery_gains_xp_when_damage_is_mitigated() {
     game.sim.monsters = vec![Monster {
         kind: MonsterKind::Imp,
         rank: MonsterRank::Normal,
+        quest_id: None,
         pack_id: 0,
         pack_center: game.sim.player.pos + vec2(12.0, 0.0),
         pos: game.sim.player.pos + vec2(12.0, 0.0),

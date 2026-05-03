@@ -6,6 +6,7 @@ mod input;
 mod inventory;
 mod menus;
 mod progression;
+mod quests;
 mod spawning;
 mod state;
 mod types;
@@ -360,22 +361,39 @@ impl Game {
             if site.tier == SettlementTier::Town || site.is_origin() {
                 npcs.push(Npc {
                     kind: NpcKind::Merchant,
+                    name: NpcKind::Merchant.name().into(),
+                    quest_id: None,
                     pos: World::tile_center(site.center + ivec2(-5, 0)),
                 });
                 npcs.push(Npc {
                     kind: NpcKind::Trainer,
+                    name: NpcKind::Trainer.name().into(),
+                    quest_id: None,
                     pos: World::tile_center(site.center + ivec2(0, -5)),
                 });
                 npcs.push(Npc {
                     kind: NpcKind::Wayfinder,
+                    name: NpcKind::Wayfinder.name().into(),
+                    quest_id: None,
                     pos: World::tile_center(site.center + ivec2(5, 0)),
                 });
             } else {
                 npcs.push(Npc {
                     kind: NpcKind::Merchant,
+                    name: NpcKind::Merchant.name().into(),
+                    quest_id: None,
                     pos: World::tile_center(site.center + ivec2(-4, 0)),
                 });
             }
+        }
+        if let Some(quest_id) = self.sim.active_quest.as_ref().map(|quest| quest.id) {
+            npcs.extend(
+                self.sim
+                    .npcs
+                    .iter()
+                    .filter(|npc| npc.quest_id == Some(quest_id))
+                    .cloned(),
+            );
         }
         self.sim.npcs = npcs;
     }

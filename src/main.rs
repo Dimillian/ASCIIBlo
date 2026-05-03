@@ -1,5 +1,6 @@
 mod content;
 mod game;
+mod launch;
 mod preview;
 mod render;
 mod stat_display;
@@ -7,6 +8,7 @@ mod ui;
 mod world;
 
 use game::{FIXED_DT, Game};
+use launch::LaunchOptions;
 use macroquad::prelude::*;
 use preview::{PreviewRequest, PreviewRunner, PreviewTick};
 use render::Renderer;
@@ -24,8 +26,10 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let mut game = Game::new(0xA5C1_1B10);
-    let preview_request = PreviewRequest::from_env();
+    let launch = LaunchOptions::from_env();
+    println!("World seed: {}", launch.seed);
+    let mut game = Game::new(launch.seed);
+    let preview_request = launch.preview_request;
     match &preview_request {
         PreviewRequest::Single { path, .. } => {
             if let Some(parent) = path.parent() {

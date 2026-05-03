@@ -16,11 +16,12 @@ pub(crate) fn draw(game: &Game) {
     draw_modal_frame(frame, "World Map");
     draw_text(
         &format!(
-            "Known tiles {}   Center ({}, {})   Zoom {:.1}x",
+            "Known tiles {}   Center ({}, {})   Zoom {:.1}x   Seed {}",
             game.sim.known_tiles.len(),
             game.ui.world_map.center_tile.x.round() as i32,
             game.ui.world_map.center_tile.y.round() as i32,
-            game.ui.world_map.zoom
+            game.ui.world_map.zoom,
+            game.world.seed
         ),
         frame.x + 24.0,
         frame.y + 66.0,

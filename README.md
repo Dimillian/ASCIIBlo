@@ -10,6 +10,13 @@ Run it with:
 cargo run
 ```
 
+Normal runs choose a fresh random world seed. To replay a world exactly, pass one explicitly:
+
+```bash
+cargo run -- --seed 12345
+cargo run -- --seed 0xA5C1_1B10
+```
+
 Generate deterministic UI previews without interacting with the live window:
 
 ```bash
@@ -17,7 +24,9 @@ cargo run -- --preview inventory --output /tmp/asciiblo-inventory.png
 cargo run -- --preview-all /tmp/asciiblo-previews
 ```
 
-Available single-screen preview modes currently include `gameplay`, `lighting`, `pickup`, `inventory`, `character`, `skill-book`, `world-map`, `shop-buy`, `shop-sell`, `trainer`, and `travel`.
+Preview commands keep a stable seed by default so screenshots stay reproducible; add `--seed` only when you intentionally want a different preview world.
+
+Available single-screen preview modes currently include `gameplay`, `lighting`, `pickup`, `inventory`, `character`, `skill-book`, `world-map`, `shop-buy`, `shop-sell`, `trainer`, `travel`, and `quest`.
 
 Controls:
 
@@ -27,6 +36,7 @@ Controls:
 - Skills: `1` and `2` cast the two skills currently bound in the mastery screen
 - Pick up loot: `E`
 - Talk to NPCs: `F`
+- Use bounty boards in towns: `F`
 - Inventory: `Tab`, then `Up` / `Down` to move, `Enter` to equip, `Backspace` to drop
 - Character sheet: `C`, then `Up` / `Down` and `Enter` to spend stat points
 - Mastery screen: `B`, then `Left` / `Right` for panels, `Up` / `Down` to move, and `1` / `2` to bind
@@ -39,6 +49,7 @@ The current slice includes:
 - Real-time cooldown-based movement and combat with bindable skills, visible cooldown states, and mana-driven spellcasting
 - An infinite deterministic overworld with larger irregular biome provinces, new wilderness regions, generated settlements, roads, landmarks, and scattered props
 - Visible biome levels, a framed minimap, a discovered-world map, and waypoint travel unlocked through discovered towns
+- Procedural bounty-board quests with kill, bounty, contact, and recovery objectives plus directional guidance
 - Monsters with different tempos, attacks, level scaling, biome-specific encounter tables, clustered packs, elite and boss ranks, and hover target readouts
 - Loot, item inspection, rarity, gear bonuses, inventory, stats, XP, levels, spendable stat points, use-based mastery, unlockable abilities, gold
 - Villages and towns with visible floorplans, safe interiors, and tiered NPC services

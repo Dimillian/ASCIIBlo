@@ -66,6 +66,7 @@ impl Game {
                 pack.push(super::Monster {
                     kind,
                     rank,
+                    quest_id: None,
                     pack_id,
                     pack_center,
                     pos,
@@ -156,7 +157,8 @@ impl Game {
 
     pub(super) fn cull_distant_monsters(&mut self) {
         self.sim.monsters.retain(|monster| {
-            monster.pack_center.distance(self.sim.player.pos) <= MONSTER_DESPAWN_RADIUS
+            monster.quest_id.is_some()
+                || monster.pack_center.distance(self.sim.player.pos) <= MONSTER_DESPAWN_RADIUS
         });
     }
 
