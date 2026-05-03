@@ -67,17 +67,6 @@ pub(crate) fn draw_label_inline(label: &str, value: &str, pos: Vec2, value_offse
     draw_text(value, pos.x + value_offset, pos.y, 18.0, WHITE);
 }
 
-pub(crate) fn draw_stat_value(label: &str, value: i32, pos: Vec2) {
-    draw_text(
-        label,
-        pos.x,
-        pos.y - 16.0,
-        14.0,
-        Color::from_rgba(180, 184, 190, 255),
-    );
-    draw_text(&value.to_string(), pos.x, pos.y + 6.0, 18.0, WHITE);
-}
-
 pub(crate) fn draw_section_label(label: &str, pos: Vec2) {
     draw_text(
         label,
@@ -137,30 +126,35 @@ pub(crate) fn draw_alert_icon(pos: Vec2) {
 
 pub(crate) fn draw_item_detail(player: &Player, item: &Item, pos: Vec2, width: f32) {
     draw_text(&item.name, pos.x, pos.y, 22.0, item.rarity.color());
-    draw_label_inline(
-        "Quality",
-        item.rarity.label(),
-        vec2(pos.x, pos.y + 28.0),
-        68.0,
+    draw_text(
+        &format!(
+            "{} {} | {}",
+            item.rarity.label(),
+            item.base_name,
+            item.slot.label()
+        ),
+        pos.x,
+        pos.y + 26.0,
+        17.0,
+        Color::from_rgba(180, 184, 190, 255),
     );
-    draw_label_inline(
-        "Slot",
-        item.slot.label(),
-        vec2(pos.x + width * 0.48, pos.y + 28.0),
-        42.0,
-    );
-    draw_label_inline("Base", &item.base_name, vec2(pos.x, pos.y + 50.0), 68.0);
     draw_label_inline(
         "Item lvl",
         &item.item_level.to_string(),
-        vec2(pos.x + width * 0.48, pos.y + 50.0),
-        70.0,
+        vec2(pos.x, pos.y + 52.0),
+        62.0,
+    );
+    draw_label_inline(
+        "Value",
+        &item.value.to_string(),
+        vec2(pos.x + width * 0.52, pos.y + 52.0),
+        48.0,
     );
 
     draw_text(
         "Affixes",
         pos.x,
-        pos.y + 76.0,
+        pos.y + 82.0,
         16.0,
         Color::from_rgba(180, 184, 190, 255),
     );
@@ -169,85 +163,70 @@ pub(crate) fn draw_item_detail(player: &Player, item: &Item, pos: Vec2, width: f
     } else {
         item.affixes.join(", ")
     };
-    for (index, line) in wrap_text(&affixes, 292.0, 18.0, 2).iter().enumerate() {
+    for (index, line) in wrap_text(&affixes, width, 18.0, 3).iter().enumerate() {
         draw_text(
             line,
             pos.x,
-            pos.y + 96.0 + index as f32 * 18.0,
+            pos.y + 102.0 + index as f32 * 18.0,
             18.0,
             item.rarity.color(),
         );
     }
 
-    let right_x = pos.x + width * 0.50;
     draw_text(
         "Bonuses",
         pos.x,
-        pos.y + 132.0,
+        pos.y + 164.0,
         16.0,
         Color::from_rgba(180, 184, 190, 255),
     );
     let bonuses = item_bonus_labels(item);
     if bonuses.is_empty() {
-        draw_text("No bonuses", pos.x, pos.y + 154.0, 17.0, WHITE);
+        draw_text("No bonuses", pos.x, pos.y + 186.0, 17.0, WHITE);
     } else {
-        for (index, bonus) in bonuses.iter().take(2).enumerate() {
+        for (index, bonus) in bonuses.iter().enumerate() {
             draw_text(
                 bonus,
                 pos.x,
-                pos.y + 154.0 + index as f32 * 18.0,
+                pos.y + 186.0 + index as f32 * 18.0,
                 17.0,
-                WHITE,
-            );
-        }
-        if bonuses.len() > 2 {
-            draw_text(
-                &format!("+{} more", bonuses.len() - 2),
-                pos.x,
-                pos.y + 190.0,
-                17.0,
-                WHITE,
+                bonus_color(bonus),
             );
         }
     }
 
     draw_text(
-        &format!("Value {}", item.value),
-        pos.x + width - 78.0,
-        pos.y + 4.0,
-        18.0,
-        WHITE,
-    );
-
-    draw_text(
         "If equipped",
-        right_x,
-        pos.y + 132.0,
+        pos.x,
+        pos.y + 282.0,
         16.0,
         Color::from_rgba(180, 184, 190, 255),
     );
     let comparisons = item_comparison_labels(player, item);
     if comparisons.is_empty() {
-        draw_text("No sheet changes", right_x, pos.y + 154.0, 17.0, WHITE);
+        draw_text("No sheet changes", pos.x, pos.y + 304.0, 17.0, WHITE);
         return;
     }
-    for (index, line) in comparisons.iter().take(3).enumerate() {
+    for (index, line) in comparisons.iter().enumerate() {
         draw_text(
             line,
-            right_x,
-            pos.y + 154.0 + index as f32 * 18.0,
+            pos.x,
+            pos.y + 304.0 + index as f32 * 18.0,
             17.0,
             WHITE,
         );
     }
-    if comparisons.len() > 3 {
-        draw_text(
-            &format!("+{} more", comparisons.len() - 3),
-            right_x,
-            pos.y + 208.0,
-            17.0,
-            WHITE,
-        );
+}
+
+fn bonus_color(label: &str) -> Color {
+    if label.starts_with("Power") {
+        Color::from_rgba(255, 160, 120, 255)
+    } else if label.starts_with("Armor") {
+        Color::from_rgba(160, 196, 255, 255)
+    } else if label.starts_with("Vitality") {
+        Color::from_rgba(144, 224, 144, 255)
+    } else {
+        Color::from_rgba(128, 214, 255, 255)
     }
 }
 

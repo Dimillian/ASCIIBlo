@@ -3,7 +3,7 @@ use rand::{RngExt, rngs::StdRng};
 
 use crate::world::Biome;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Slot {
     Weapon,
     Armor,
@@ -17,6 +17,26 @@ impl Slot {
             Slot::Armor => "Armor",
             Slot::Charm => "Charm",
         }
+    }
+
+    pub fn footprint(self) -> ItemFootprint {
+        match self {
+            Slot::Weapon => ItemFootprint::new(1, 3),
+            Slot::Armor => ItemFootprint::new(2, 3),
+            Slot::Charm => ItemFootprint::new(1, 1),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ItemFootprint {
+    pub width: usize,
+    pub height: usize,
+}
+
+impl ItemFootprint {
+    pub const fn new(width: usize, height: usize) -> Self {
+        Self { width, height }
     }
 }
 
@@ -48,7 +68,7 @@ impl Rarity {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Item {
     pub name: String,
     pub base_name: String,
@@ -61,6 +81,12 @@ pub struct Item {
     pub vitality: i32,
     pub haste: i32,
     pub value: i32,
+}
+
+impl Item {
+    pub fn footprint(&self) -> ItemFootprint {
+        self.slot.footprint()
+    }
 }
 
 #[derive(Clone, Copy)]

@@ -193,6 +193,122 @@ impl Equipment {
     }
 }
 
+pub const BACKPACK_WIDTH: usize = 9;
+pub const BACKPACK_HEIGHT: usize = 8;
+
+#[derive(Clone)]
+pub struct BackpackEntry {
+    pub item: Item,
+    pub x: usize,
+    pub y: usize,
+}
+
+#[derive(Default)]
+pub struct Backpack {
+    entries: Vec<BackpackEntry>,
+}
+
+impl Backpack {
+    pub fn from_items(items: Vec<Item>) -> Self {
+        let mut backpack = Self::default();
+        for item in items {
+            backpack
+                .insert_first_fit(item)
+                .expect("starter items must fit in the backpack");
+        }
+        backpack
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Item> {
+        self.entries.iter().map(|entry| &entry.item)
+    }
+
+    pub fn entries(&self) -> &[BackpackEntry] {
+        &self.entries
+    }
+
+    pub fn entry(&self, index: usize) -> Option<&BackpackEntry> {
+        self.entries.get(index)
+    }
+
+    pub fn item(&self, index: usize) -> Option<&Item> {
+        self.entry(index).map(|entry| &entry.item)
+    }
+
+    pub fn entry_index_at(&self, x: usize, y: usize) -> Option<usize> {
+        self.entries.iter().position(|entry| {
+            let footprint = entry.item.footprint();
+            x >= entry.x
+                && x < entry.x + footprint.width
+                && y >= entry.y
+                && y < entry.y + footprint.height
+        })
+    }
+
+    pub fn can_fit(&self, item: &Item) -> bool {
+        self.find_first_fit(item).is_some()
+    }
+
+    pub fn insert_first_fit(&mut self, item: Item) -> Result<usize, Item> {
+        let Some((x, y)) = self.find_first_fit(&item) else {
+            return Err(item);
+        };
+        self.entries.push(BackpackEntry { item, x, y });
+        self.sort_entries();
+        Ok(self
+            .entries
+            .iter()
+            .position(|entry| entry.x == x && entry.y == y)
+            .expect("new backpack entry should exist"))
+    }
+
+    pub fn remove(&mut self, index: usize) -> Option<BackpackEntry> {
+        if index >= self.entries.len() {
+            return None;
+        }
+        Some(self.entries.remove(index))
+    }
+
+    pub fn restore(&mut self, entry: BackpackEntry) {
+        self.entries.push(entry);
+        self.sort_entries();
+    }
+
+    fn find_first_fit(&self, item: &Item) -> Option<(usize, usize)> {
+        let footprint = item.footprint();
+        if footprint.width > BACKPACK_WIDTH || footprint.height > BACKPACK_HEIGHT {
+            return None;
+        }
+        for y in 0..=BACKPACK_HEIGHT - footprint.height {
+            for x in 0..=BACKPACK_WIDTH - footprint.width {
+                if self.fits_at(item, x, y) {
+                    return Some((x, y));
+                }
+            }
+        }
+        None
+    }
+
+    fn fits_at(&self, item: &Item, x: usize, y: usize) -> bool {
+        let footprint = item.footprint();
+        (x..x + footprint.width).all(|cell_x| {
+            (y..y + footprint.height).all(|cell_y| self.entry_index_at(cell_x, cell_y).is_none())
+        })
+    }
+
+    fn sort_entries(&mut self) {
+        self.entries.sort_by_key(|entry| (entry.y, entry.x));
+    }
+}
+
 pub struct Player {
     pub pos: Vec2,
     pub vel: Vec2,
@@ -203,7 +319,7 @@ pub struct Player {
     pub ability_cooldowns: [f32; 8],
     pub bound_abilities: [AbilityKind; 2],
     pub stats: Stats,
-    pub inventory: Vec<Item>,
+    pub inventory: Backpack,
     pub equipment: Equipment,
     pub disciplines: Disciplines,
 }
@@ -410,6 +526,12 @@ impl Quest {
 pub enum ShopTab {
     Buy,
     Sell,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InventoryFocus {
+    Backpack,
+    Equipment,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

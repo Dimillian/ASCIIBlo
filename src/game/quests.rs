@@ -491,9 +491,13 @@ impl Game {
                 &mut self.runtime.rng,
                 self.world.biome_level(quest.target_pos).max(1),
             );
-            if self.sim.player.inventory.len() < 14 {
+            if self.sim.player.inventory.can_fit(&item) {
                 self.log(format!("The board pays extra: {}.", item.name));
-                self.sim.player.inventory.push(item);
+                self.sim
+                    .player
+                    .inventory
+                    .insert_first_fit(item)
+                    .expect("fitting quest reward should insert");
             } else {
                 self.log(format!("The board leaves {} at your feet.", item.name));
                 self.sim.loot.push(Loot {

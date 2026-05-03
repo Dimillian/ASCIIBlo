@@ -2,7 +2,7 @@ use super::*;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    content::{MonsterKind, MonsterRank, monster_xp, roll_item},
+    content::{Item, MonsterKind, MonsterRank, Rarity, Slot, monster_xp, roll_item},
     stat_display::item_summary,
 };
 
@@ -24,6 +24,37 @@ fn test_monster(kind: MonsterKind, pos: Vec2) -> Monster {
         hit_flash: 0.0,
         chill_ttl: 0.0,
     }
+}
+
+fn test_item(name: &str, slot: Slot) -> Item {
+    Item {
+        name: name.into(),
+        base_name: match slot {
+            Slot::Weapon => "Dirk",
+            Slot::Armor => "Vest",
+            Slot::Charm => "Ring",
+        }
+        .into(),
+        slot,
+        rarity: Rarity::Normal,
+        item_level: 1,
+        affixes: Vec::new(),
+        power: 0,
+        armor: 0,
+        vitality: 0,
+        haste: 0,
+        value: 1,
+    }
+}
+
+fn full_backpack() -> Backpack {
+    let mut backpack = Backpack::default();
+    for index in 0..BACKPACK_WIDTH * BACKPACK_HEIGHT {
+        backpack
+            .insert_first_fit(test_item(&format!("Charm {index}"), Slot::Charm))
+            .unwrap();
+    }
+    backpack
 }
 
 fn discover_towns(game: &mut Game, count: usize) {
@@ -599,11 +630,142 @@ fn combat_feed_scrolls_through_older_entries() {
 #[test]
 fn equipping_moves_item_into_matching_slot() {
     let mut game = Game::new(1);
-    game.ui.inventory_cursor = 0;
+    game.ui.inventory_backpack_cursor = 0;
     game.equip_selected_item();
 
     assert!(game.sim.player.equipment.weapon.is_some());
     assert_eq!(game.sim.player.inventory.len(), 1);
+}
+
+#[test]
+fn backpack_places_items_by_first_fitting_grid_slot() {
+    let mut backpack = Backpack::default();
+    backpack
+        .insert_first_fit(test_item("Starter Dirk", Slot::Weapon))
+        .unwrap();
+    backpack
+        .insert_first_fit(test_item("Starter Vest", Slot::Armor))
+        .unwrap();
+    backpack
+        .insert_first_fit(test_item("Starter Ring", Slot::Charm))
+        .unwrap();
+
+    assert_eq!((backpack.entries()[0].x, backpack.entries()[0].y), (0, 0));
+    assert_eq!((backpack.entries()[1].x, backpack.entries()[1].y), (1, 0));
+    assert_eq!((backpack.entries()[2].x, backpack.entries()[2].y), (3, 0));
+}
+
+#[test]
+fn backpack_capacity_is_limited_by_occupied_cells() {
+    let mut backpack = full_backpack();
+
+    assert_eq!(backpack.len(), BACKPACK_WIDTH * BACKPACK_HEIGHT);
+    assert!(!backpack.can_fit(&test_item("Overflow Dirk", Slot::Weapon)));
+    assert!(
+        backpack
+            .insert_first_fit(test_item("Overflow Ring", Slot::Charm))
+            .is_err()
+    );
+}
+
+#[test]
+fn equipping_swaps_previous_gear_back_into_the_backpack() {
+    let mut game = Game::new(1);
+    game.sim.player.inventory = Backpack::from_items(vec![test_item("New Dirk", Slot::Weapon)]);
+    game.sim.player.equipment.weapon = Some(test_item("Old Dirk", Slot::Weapon));
+    game.ui.inventory_backpack_cursor = 0;
+
+    game.equip_selected_item();
+
+    assert_eq!(
+        game.sim.player.equipment.weapon.as_ref().unwrap().name,
+        "New Dirk"
+    );
+    assert_eq!(game.sim.player.inventory.item(0).unwrap().name, "Old Dirk");
+}
+
+#[test]
+fn overflowing_pickups_and_buys_leave_the_pack_unchanged() {
+    let mut game = Game::new(1);
+    game.sim.player.inventory = full_backpack();
+    game.sim.loot.push(Loot {
+        pos: game.sim.player.pos,
+        item: test_item("Overflow Dirk", Slot::Weapon),
+        bob: 0.0,
+    });
+    game.pickup_loot();
+    assert_eq!(game.sim.loot.len(), 1);
+    assert_eq!(
+        game.fx.log.last().map(String::as_str),
+        Some("Pack is full. Equip or drop something first.")
+    );
+
+    game.sim.player.stats.gold = 100;
+    game.ui.shop_cursor = 0;
+    game.buy_selected_item();
+    assert_eq!(game.sim.player.stats.gold, 100);
+    assert_eq!(
+        game.fx.log.last().map(String::as_str),
+        Some("Pack is full.")
+    );
+}
+
+#[test]
+fn overflowing_quest_rewards_drop_at_the_players_feet() {
+    let mut game = Game::new(1);
+    game.sim.player.inventory = full_backpack();
+    game.sim.active_quest = Some(Quest {
+        id: 77,
+        kind: QuestKind::MeetNpc,
+        signature: QuestSignature::MeetNpc { town_id: 1 },
+        stage: QuestStage::ReadyToTurnIn,
+        giver: origin_town(&game),
+        title: "Overflow Trial".into(),
+        objective: "Return".into(),
+        target_pos: game.sim.player.pos,
+        progress: 1,
+        goal: 1,
+        reward: QuestReward {
+            gold: 0,
+            xp: 0,
+            item_chance: 1.0,
+        },
+    });
+
+    game.sim.player.pos = Game::quest_board_pos(origin_town(&game));
+    assert!(game.interact_with_nearby_quest_board());
+
+    assert_eq!(
+        game.sim.player.inventory.len(),
+        BACKPACK_WIDTH * BACKPACK_HEIGHT
+    );
+    assert_eq!(game.sim.loot.len(), 1);
+    assert!(
+        game.fx
+            .log
+            .last()
+            .is_some_and(|line| line.starts_with("The board leaves "))
+    );
+}
+
+#[test]
+fn unequipping_fails_when_the_pack_has_no_space_for_the_item() {
+    let mut game = Game::new(1);
+    game.sim.player.inventory = full_backpack();
+    game.sim.player.equipment.weapon = Some(test_item("Bound Dirk", Slot::Weapon));
+    game.ui.inventory_focus = InventoryFocus::Equipment;
+    game.ui.inventory_equipment_cursor = 0;
+
+    game.unequip_selected_item();
+
+    assert_eq!(
+        game.sim.player.equipment.weapon.as_ref().unwrap().name,
+        "Bound Dirk"
+    );
+    assert_eq!(
+        game.fx.log.last().map(String::as_str),
+        Some("Pack is full. Cannot unequip gear.")
+    );
 }
 
 #[test]
@@ -669,7 +831,7 @@ fn gameplay_smoke_flow_reaches_combat_loot_shop_and_travel() {
     game.pickup_loot();
     assert_eq!(game.sim.player.inventory.len(), inventory_before_loot + 1);
 
-    game.ui.inventory_cursor = 0;
+    game.ui.inventory_backpack_cursor = 0;
     game.equip_selected_item();
     assert!(game.sim.player.equipment.weapon.is_some());
 
@@ -1221,7 +1383,16 @@ fn every_ui_window_supports_basic_navigation() {
     assert_eq!(game.ui.mode, UiMode::Inventory);
     game.runtime.input.inventory_down_pressed = true;
     game.fixed_update(FIXED_DT);
-    assert_eq!(game.ui.inventory_cursor, 1);
+    assert_eq!(game.ui.inventory_backpack_cursor, 1);
+    game.runtime.input.nav_right_pressed = true;
+    game.fixed_update(FIXED_DT);
+    assert_eq!(game.ui.inventory_focus, InventoryFocus::Equipment);
+    game.runtime.input.inventory_down_pressed = true;
+    game.fixed_update(FIXED_DT);
+    assert_eq!(game.ui.inventory_equipment_cursor, 1);
+    game.runtime.input.nav_left_pressed = true;
+    game.fixed_update(FIXED_DT);
+    assert_eq!(game.ui.inventory_focus, InventoryFocus::Backpack);
 
     game.ui.mode = UiMode::None;
     game.runtime.input = InputState::default();

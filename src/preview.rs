@@ -82,7 +82,9 @@ impl PreviewMode {
         game.sim.player.stats.gold = 128;
         game.ui.shop_cursor = 0;
         game.ui.travel_cursor = 0;
-        game.ui.inventory_cursor = 0;
+        game.ui.inventory_focus = crate::game::InventoryFocus::Backpack;
+        game.ui.inventory_backpack_cursor = 0;
+        game.ui.inventory_equipment_cursor = 0;
         game.ui.character_cursor = 0;
         game.ui.skill_book_cursor = 0;
         game.ui.skill_book_ability_cursor = 0;
@@ -219,7 +221,77 @@ impl PreviewMode {
                     bob: 0.0,
                 });
             }
-            PreviewMode::Inventory => game.ui.mode = UiMode::Inventory,
+            PreviewMode::Inventory => {
+                game.sim.player.inventory = crate::game::Backpack::from_items(vec![
+                    Item {
+                        name: "Copper Dirk".into(),
+                        base_name: "Dirk".into(),
+                        slot: Slot::Weapon,
+                        rarity: Rarity::Normal,
+                        item_level: 1,
+                        affixes: Vec::new(),
+                        power: 2,
+                        armor: 0,
+                        vitality: 0,
+                        haste: 1,
+                        value: 7,
+                    },
+                    Item {
+                        name: "Padded Vest".into(),
+                        base_name: "Vest".into(),
+                        slot: Slot::Armor,
+                        rarity: Rarity::Normal,
+                        item_level: 1,
+                        affixes: Vec::new(),
+                        power: 0,
+                        armor: 2,
+                        vitality: 1,
+                        haste: 0,
+                        value: 8,
+                    },
+                    Item {
+                        name: "Ring of Warding".into(),
+                        base_name: "Ring".into(),
+                        slot: Slot::Charm,
+                        rarity: Rarity::Magic,
+                        item_level: 2,
+                        affixes: vec!["of Warding".into()],
+                        power: 0,
+                        armor: 3,
+                        vitality: 1,
+                        haste: 0,
+                        value: 23,
+                    },
+                    Item {
+                        name: "Storm Mantle".into(),
+                        base_name: "Mantle".into(),
+                        slot: Slot::Armor,
+                        rarity: Rarity::Rare,
+                        item_level: 4,
+                        affixes: vec!["Storm".into(), "of the Fox".into(), "Iron".into()],
+                        power: 0,
+                        armor: 5,
+                        vitality: 3,
+                        haste: 1,
+                        value: 44,
+                    },
+                ]);
+                game.sim.player.equipment.weapon = Some(Item {
+                    name: "Copper Dirk".into(),
+                    base_name: "Dirk".into(),
+                    slot: Slot::Weapon,
+                    rarity: Rarity::Normal,
+                    item_level: 1,
+                    affixes: Vec::new(),
+                    power: 2,
+                    armor: 0,
+                    vitality: 0,
+                    haste: 1,
+                    value: 7,
+                });
+                game.ui.inventory_backpack_cursor = 2;
+                game.ui.mode = UiMode::Inventory;
+            }
             PreviewMode::Character => {
                 game.sim.player.stats.unspent_stat_points = 3;
                 game.ui.mode = UiMode::Character;

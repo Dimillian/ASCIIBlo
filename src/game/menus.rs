@@ -5,21 +5,66 @@ use crate::{
     world::{LandmarkKind, World},
 };
 
-use super::{EXPLORATION_RADIUS, Game, ShopTab, UiMode};
+use super::{EXPLORATION_RADIUS, Game, InventoryFocus, ShopTab, UiMode};
 
 impl Game {
     pub(super) fn update_inventory_controls(&mut self) {
-        if self.runtime.input.inventory_up_pressed {
-            self.ui.inventory_cursor = self.ui.inventory_cursor.saturating_sub(1);
+        if self.runtime.input.attack_pressed {
+            match crate::ui::inventory_hit_test(self, self.ui_hover_position()) {
+                Some(crate::ui::inventory::InventoryHit::Backpack(index)) => {
+                    self.ui.inventory_focus = InventoryFocus::Backpack;
+                    self.ui.inventory_backpack_cursor = index;
+                    self.equip_selected_item();
+                    return;
+                }
+                Some(crate::ui::inventory::InventoryHit::Equipment(index)) => {
+                    self.ui.inventory_focus = InventoryFocus::Equipment;
+                    self.ui.inventory_equipment_cursor = index;
+                    self.unequip_selected_item();
+                    return;
+                }
+                None => {}
+            }
         }
-        if self.runtime.input.inventory_down_pressed && !self.sim.player.inventory.is_empty() {
-            self.ui.inventory_cursor =
-                (self.ui.inventory_cursor + 1).min(self.sim.player.inventory.len() - 1);
+        if self.runtime.input.nav_left_pressed {
+            self.ui.inventory_focus = InventoryFocus::Backpack;
+        }
+        if self.runtime.input.nav_right_pressed {
+            self.ui.inventory_focus = InventoryFocus::Equipment;
+        }
+        match self.ui.inventory_focus {
+            InventoryFocus::Backpack => {
+                if self.runtime.input.inventory_up_pressed {
+                    self.ui.inventory_backpack_cursor =
+                        self.ui.inventory_backpack_cursor.saturating_sub(1);
+                }
+                if self.runtime.input.inventory_down_pressed
+                    && !self.sim.player.inventory.is_empty()
+                {
+                    self.ui.inventory_backpack_cursor = (self.ui.inventory_backpack_cursor + 1)
+                        .min(self.sim.player.inventory.len() - 1);
+                }
+            }
+            InventoryFocus::Equipment => {
+                if self.runtime.input.inventory_up_pressed {
+                    self.ui.inventory_equipment_cursor =
+                        self.ui.inventory_equipment_cursor.saturating_sub(1);
+                }
+                if self.runtime.input.inventory_down_pressed {
+                    self.ui.inventory_equipment_cursor =
+                        (self.ui.inventory_equipment_cursor + 1).min(2);
+                }
+            }
         }
         if self.runtime.input.inventory_equip_pressed {
-            self.equip_selected_item();
+            match self.ui.inventory_focus {
+                InventoryFocus::Backpack => self.equip_selected_item(),
+                InventoryFocus::Equipment => self.unequip_selected_item(),
+            }
         }
-        if self.runtime.input.inventory_drop_pressed {
+        if self.runtime.input.inventory_drop_pressed
+            && self.ui.inventory_focus == InventoryFocus::Backpack
+        {
             self.drop_selected_item();
         }
     }

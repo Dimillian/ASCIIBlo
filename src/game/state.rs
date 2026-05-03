@@ -29,7 +29,9 @@ pub struct SimulationState {
 
 pub struct UiState {
     pub mode: UiMode,
-    pub inventory_cursor: usize,
+    pub inventory_focus: super::InventoryFocus,
+    pub inventory_backpack_cursor: usize,
+    pub inventory_equipment_cursor: usize,
     pub character_cursor: usize,
     pub skill_book_cursor: usize,
     pub skill_book_ability_cursor: usize,
@@ -107,7 +109,9 @@ impl UiState {
     pub(super) fn new() -> Self {
         Self {
             mode: UiMode::None,
-            inventory_cursor: 0,
+            inventory_focus: super::InventoryFocus::Backpack,
+            inventory_backpack_cursor: 0,
+            inventory_equipment_cursor: 0,
             character_cursor: 0,
             skill_book_cursor: 0,
             skill_book_ability_cursor: 0,

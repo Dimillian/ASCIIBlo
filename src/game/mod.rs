@@ -72,7 +72,7 @@ impl Game {
                 gold: 0,
                 unspent_stat_points: 0,
             },
-            inventory: starter_items(),
+            inventory: Backpack::from_items(starter_items()),
             equipment: Equipment {
                 weapon: None,
                 armor: None,
@@ -129,9 +129,9 @@ impl Game {
             } else {
                 UiMode::Inventory
             };
-            self.ui.inventory_cursor = self
+            self.ui.inventory_backpack_cursor = self
                 .ui
-                .inventory_cursor
+                .inventory_backpack_cursor
                 .min(self.sim.player.inventory.len().saturating_sub(1));
         }
         if self.runtime.input.character_toggle_pressed {

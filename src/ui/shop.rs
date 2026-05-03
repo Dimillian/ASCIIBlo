@@ -13,7 +13,7 @@ use super::widgets::{
 
 pub(crate) fn draw(game: &Game) {
     let w = 760.0;
-    let h = 440.0;
+    let h = 560.0;
     let x = (screen_width() - w) * 0.5;
     let y = (screen_height() - h) * 0.5;
     draw_modal_backdrop();
@@ -44,11 +44,11 @@ pub(crate) fn draw(game: &Game) {
     );
     // Keep the tab row visually separate from the labeled content panels below it.
     let content_y = y + 132.0;
-    draw_section_box(Rect::new(x + 24.0, content_y, 360.0, 232.0), "Stock");
-    draw_section_box(Rect::new(x + 408.0, content_y, 328.0, 232.0), "Inspect");
-    let items: &[Item] = match game.ui.shop_tab {
-        ShopTab::Buy => &game.sim.merchant_stock,
-        ShopTab::Sell => &game.sim.player.inventory,
+    draw_section_box(Rect::new(x + 24.0, content_y, 360.0, 380.0), "Stock");
+    draw_section_box(Rect::new(x + 408.0, content_y, 328.0, 380.0), "Inspect");
+    let items: Vec<&Item> = match game.ui.shop_tab {
+        ShopTab::Buy => game.sim.merchant_stock.iter().collect(),
+        ShopTab::Sell => game.sim.player.inventory.iter().collect(),
     };
     for (index, item) in items.iter().enumerate() {
         let row_y = y + 170.0 + index as f32 * 32.0;
@@ -78,7 +78,7 @@ pub(crate) fn draw(game: &Game) {
         );
     }
     if let Some(item) = items.get(game.ui.shop_cursor) {
-        draw_item_detail(&game.sim.player, item, vec2(x + 426.0, y + 170.0), 292.0);
+        draw_item_detail(&game.sim.player, item, vec2(x + 426.0, y + 150.0), 292.0);
     }
     let mut hint_x = x + 24.0;
     hint_x += draw_hotkey_hint("Left/Right", "tab", vec2(hint_x, y + h - 44.0)) + 12.0;

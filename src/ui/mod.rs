@@ -1,6 +1,6 @@
 mod character;
 mod hud;
-mod inventory;
+pub(crate) mod inventory;
 mod shop;
 mod skill_book;
 mod trainer;
@@ -17,6 +17,10 @@ pub(crate) fn draw_hud(game: &Game) {
 
 pub(crate) fn draw_inventory(game: &Game) {
     inventory::draw(game);
+}
+
+pub(crate) fn inventory_hit_test(game: &Game, pos: Vec2) -> Option<inventory::InventoryHit> {
+    inventory::hit_test(game, pos)
 }
 
 pub(crate) fn draw_character(game: &Game) {
