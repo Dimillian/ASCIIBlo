@@ -395,10 +395,6 @@ fn draw_detail(game: &Game, discipline: DisciplineKind, selected: Option<Ability
             },
         );
     }
-    draw_binding_prompts(game, ability, rect);
-}
-
-fn draw_binding_prompts(game: &Game, ability: AbilityKind, rect: Rect) {
     if !game.player.is_ability_unlocked(ability) {
         draw_text(
             &format!("Unlocks at level {}", ability.unlock_level()),
@@ -407,36 +403,7 @@ fn draw_binding_prompts(game: &Game, ability: AbilityKind, rect: Rect) {
             16.0,
             MUTED,
         );
-        return;
     }
-    for slot in 0..game.player.bound_abilities.len() {
-        let line_y = rect.y + rect.h - 36.0 + slot as f32 * 20.0;
-        draw_text(
-            &binding_prompt(game, ability, slot),
-            rect.x + 16.0,
-            line_y,
-            16.0,
-            if slot == 0 { GOLD } else { WHITE },
-        );
-    }
-}
-
-fn binding_prompt(game: &Game, ability: AbilityKind, slot: usize) -> String {
-    if game.player.bound_abilities[slot] == ability {
-        return format!("{} already bound to {}", ability.name(), slot + 1);
-    }
-    if game.player.bound_slot(ability).is_some() {
-        return format!(
-            "Press {} to swap with {}",
-            slot + 1,
-            game.player.bound_abilities[slot].name()
-        );
-    }
-    format!(
-        "Press {} to replace {}",
-        slot + 1,
-        game.player.bound_abilities[slot].name()
-    )
 }
 
 fn draw_badge(text: &str, x: f32, y: f32, color: Color) {
