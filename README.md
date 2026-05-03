@@ -36,13 +36,13 @@ Controls:
 The current slice includes:
 
 - Native windowed rendering with a smooth camera and layered UI
-- Real-time cooldown-based movement and combat
+- Real-time cooldown-based movement and combat with bindable skills, visible cooldown states, and mana-driven spellcasting
 - An infinite deterministic overworld with larger irregular biome provinces, new wilderness regions, generated settlements, roads, landmarks, and scattered props
 - Visible biome levels, a framed minimap, a discovered-world map, and waypoint travel unlocked through discovered towns
-- Monsters with different tempos, attacks, level scaling, biome-specific encounter tables, and hover target readouts
-- Loot, item inspection, rarity, gear bonuses, inventory, stats, XP, levels, spendable stat points, use-based mastery, gold
+- Monsters with different tempos, attacks, level scaling, biome-specific encounter tables, clustered packs, elite and boss ranks, and hover target readouts
+- Loot, item inspection, rarity, gear bonuses, inventory, stats, XP, levels, spendable stat points, use-based mastery, unlockable abilities, gold
 - Villages and towns with visible floorplans, safe interiors, and tiered NPC services
-- Floating damage text, crits, particles, a compact combat feed, pickup feedback, skill bursts, and level-up fireworks
+- Floating damage text, crits, particles, colored scene lighting, item and skill glows, a compact combat feed, pickup feedback, skill bursts, and level-up fireworks
 - Dedicated modal UI for inventory, character progression, merchant buy/sell flows, trainer guidance, travel, and the world map
 
 The visual language still uses glyphs, punctuation, and bright text as texture, but the game itself now runs through a real renderer instead of a terminal escape-sequence loop.

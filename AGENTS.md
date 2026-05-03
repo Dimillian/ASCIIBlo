@@ -34,6 +34,7 @@ cargo run -- --preview-all /tmp/asciiblo-previews
   - `spawning.rs`: monster spawn, cull, and refill rules.
   - `menus.rs`: gameplay-side control flow for character, skill book, shops, travel, and world map state.
   - `inventory.rs`: loot pickup, equip, buy, sell, and drop behavior.
+  - `progression.rs`: use-based mastery XP, discipline level-ups, unlock notifications, and agility travel XP.
   - `tests.rs`: focused gameplay coverage and smoke flows.
 - `src/world.rs`
   - Deterministic procedural world generation, biome layout, tile lookup, walkability, and biome-level progression.
@@ -54,6 +55,7 @@ cargo run -- --preview-all /tmp/asciiblo-previews
   - Spawn/refill behavior belongs in `game/spawning.rs`.
   - Menu-side gameplay behavior belongs in `game/menus.rs`.
   - Inventory economy belongs in `game/inventory.rs`.
+  - Mastery/progression behavior belongs in `game/progression.rs`.
   - Shared gameplay data types belong in `game/types.rs`.
   - Procedural geography belongs in `world.rs`.
   - Data tables and loot formulas belong in `content.rs`.
@@ -66,9 +68,11 @@ cargo run -- --preview-all /tmp/asciiblo-previews
 
 ## Current Design Notes
 
-- The world is infinite and deterministic, with a handcrafted safe town at the origin and irregular repeated biome provinces outside it.
+- The world is infinite and deterministic, with a handcrafted safe town at the origin plus generated villages, towns, roads, landmarks, and irregular repeated biome provinces outside it.
 - Biome level is based on distance from town, but biome identity is intentionally not a clean ring pattern.
-- Monsters are spawned near the player and scale from local biome level, not player level directly.
+- Towns unlock waypoint travel when discovered; villages are local services only.
+- Monsters are spawned in nearby local packs and scale from local biome level, not player level directly.
+- Character leveling grants stat points, while disciplines advance from use, unlock abilities, and feed passive bonuses such as Magic-based mana regeneration.
 - Loot is rolled from monster level:
   - rarity first
   - then a base item
@@ -91,7 +95,7 @@ For UI changes, also render at least the relevant preview:
 cargo run -- --preview inventory --output /tmp/asciiblo-inventory.png
 ```
 
-Use `--preview-all` when a change may affect multiple windows or shared layout helpers.
+Use `lighting`, `skill-book`, or another targeted mode when changing a specific surface, and use `--preview-all` when a change may affect multiple windows or shared layout helpers.
 
 ## Common Pitfalls
 
@@ -99,6 +103,7 @@ Use `--preview-all` when a change may affect multiple windows or shared layout h
 - Be careful when optimizing rendering. Measure or validate behavior before replacing a simple draw path with a more complex caching layer.
 - Avoid making biomes purely concentric again; progression should exist without making the world feel like nested circles.
 - Do not couple enemy or loot scaling to the player unless that is the explicit design change. The current game uses world/monster level as the source of progression pressure.
+- Do not blur the distinction between towns and villages; waypoint travel is intentionally town-only.
 - When changing layout, check long strings and low-resolution cases. This UI has already had overlap bugs from optimistic spacing.
 
 ## Product Direction
