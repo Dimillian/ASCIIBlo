@@ -99,10 +99,13 @@ pub(crate) fn draw(game: &Game) {
         Color::from_rgba(255, 224, 96, 180),
     );
     let mut bottom_x = 22.0;
-    bottom_x += draw_hotkey_hint("1", "rush", vec2(bottom_x, bar_y + 17.0)) + 14.0;
-    bottom_x += draw_hotkey_hint("2", "nova", vec2(bottom_x, bar_y + 17.0)) + 14.0;
-    bottom_x += draw_hotkey_hint("3", "fireball", vec2(bottom_x, bar_y + 17.0)) + 14.0;
-    bottom_x += draw_hotkey_hint("4", "cleave", vec2(bottom_x, bar_y + 17.0)) + 14.0;
+    for (index, ability) in game.player.bound_abilities.iter().copied().enumerate() {
+        bottom_x += draw_ability_hint(
+            &(index + 1).to_string(),
+            &ability.name().to_lowercase(),
+            vec2(bottom_x, bar_y + 17.0),
+        ) + 14.0;
+    }
     bottom_x += draw_hotkey_hint("E", "loot", vec2(bottom_x, bar_y + 17.0)) + 14.0;
     bottom_x += draw_hotkey_hint("F", "talk", vec2(bottom_x, bar_y + 17.0)) + 14.0;
     bottom_x += draw_hotkey_hint("Tab", "inventory", vec2(bottom_x, bar_y + 17.0)) + 14.0;
@@ -112,12 +115,7 @@ pub(crate) fn draw(game: &Game) {
         vec2(bottom_x, bar_y + 17.0),
         game.player.stats.unspent_stat_points > 0,
     ) + 14.0;
-    bottom_x += draw_alerting_hotkey_hint(
-        "B",
-        "skills",
-        vec2(bottom_x, bar_y + 17.0),
-        game.player.stats.unspent_skill_points > 0,
-    ) + 14.0;
+    bottom_x += draw_hotkey_hint("B", "mastery", vec2(bottom_x, bar_y + 17.0)) + 14.0;
     draw_hotkey_hint("M", "map", vec2(bottom_x, bar_y + 17.0));
     draw_text(
         &format!(
@@ -132,6 +130,7 @@ pub(crate) fn draw(game: &Game) {
         WHITE,
     );
     draw_log(game);
+    draw_skill_feedback(game);
     draw_minimap(game);
     draw_hovered_monster_tooltip(game);
     draw_nearest_loot_tooltip(game);
@@ -143,6 +142,56 @@ fn draw_alerting_hotkey_hint(label: &str, text: &str, pos: Vec2, alert: bool) ->
         draw_alert_icon(vec2(pos.x + hotkey_badge_width(label) - 2.0, pos.y - 2.0));
     }
     width
+}
+
+fn draw_ability_hint(label: &str, text: &str, pos: Vec2) -> f32 {
+    let badge_w = draw_hotkey_badge(label, pos);
+    draw_text(
+        text,
+        pos.x + badge_w + 8.0,
+        pos.y + 18.0,
+        17.0,
+        Color::from_rgba(210, 214, 220, 255),
+    );
+    badge_w + 8.0 + measure_text(text, None, 17, 1.0).width
+}
+
+fn draw_skill_feedback(game: &Game) {
+    let panel_w = 260.0;
+    let x = screen_width() - panel_w - 18.0;
+    let mut y = 300.0;
+
+    for notification in game.notifications.iter().rev().take(3) {
+        draw_feedback_row(x, y, panel_w, &notification.text, notification.color, 1.0);
+        y += 34.0;
+    }
+    for toast in game.skill_xp_toasts.iter().rev().take(3) {
+        draw_feedback_row(
+            x,
+            y,
+            panel_w,
+            &format!("+{} {} XP", toast.amount, toast.kind.name()),
+            toast.kind.color(),
+            if toast.ttl > 0.65 {
+                1.0
+            } else {
+                (toast.ttl / 0.65).clamp(0.3, 1.0)
+            },
+        );
+        y += 34.0;
+    }
+}
+
+fn draw_feedback_row(x: f32, y: f32, w: f32, text: &str, color: Color, alpha: f32) {
+    draw_rectangle(
+        x,
+        y,
+        w,
+        26.0,
+        with_alpha(Color::from_rgba(12, 14, 18, 255), 0.86 * alpha),
+    );
+    draw_rectangle(x, y, 4.0, 26.0, with_alpha(color, alpha));
+    draw_text(text, x + 12.0, y + 19.0, 17.0, with_alpha(WHITE, alpha));
 }
 
 fn draw_log(game: &Game) {

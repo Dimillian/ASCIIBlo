@@ -55,6 +55,7 @@ impl Game {
                 attack_cd: self.rng.random_range(0.0..kind.attack_cooldown()),
                 wobble: self.rng.random_range(0.0..10.0),
                 hit_flash: 0.0,
+                chill_ttl: 0.0,
             });
             break;
         }

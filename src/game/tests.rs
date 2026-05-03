@@ -1,8 +1,24 @@
 use super::*;
 use crate::content::{MonsterKind, monster_xp, roll_item};
 
+fn test_monster(kind: MonsterKind, pos: Vec2) -> Monster {
+    Monster {
+        kind,
+        pos,
+        vel: Vec2::ZERO,
+        hit_offset: Vec2::ZERO,
+        hp: 80.0,
+        max_hp: 80.0,
+        level: 1,
+        attack_cd: 0.0,
+        wobble: 0.0,
+        hit_flash: 0.0,
+        chill_ttl: 0.0,
+    }
+}
+
 #[test]
-fn leveling_grants_spendable_points() {
+fn leveling_grants_only_stat_points() {
     let mut game = Game::new(1);
     game.player.stats.xp = game.player.stats.next_xp - monster_xp(MonsterKind::Imp, 1);
     game.on_monster_killed(Monster {
@@ -16,11 +32,11 @@ fn leveling_grants_spendable_points() {
         attack_cd: 0.0,
         wobble: 0.0,
         hit_flash: 0.0,
+        chill_ttl: 0.0,
     });
 
     assert_eq!(game.player.stats.level, 2);
     assert_eq!(game.player.stats.unspent_stat_points, 3);
-    assert_eq!(game.player.stats.unspent_skill_points, 1);
 }
 
 #[test]
@@ -107,6 +123,7 @@ fn hovered_monster_prefers_the_enemy_under_the_cursor() {
             attack_cd: 0.0,
             wobble: 0.0,
             hit_flash: 0.0,
+            chill_ttl: 0.0,
         },
         Monster {
             kind: MonsterKind::Brute,
@@ -119,6 +136,7 @@ fn hovered_monster_prefers_the_enemy_under_the_cursor() {
             attack_cd: 0.0,
             wobble: 0.0,
             hit_flash: 0.0,
+            chill_ttl: 0.0,
         },
     ];
     game.input.aim_world = game.player.pos + vec2(24.0, 0.0);
@@ -191,6 +209,7 @@ fn gameplay_smoke_flow_reaches_combat_loot_shop_and_travel() {
         attack_cd: 0.0,
         wobble: 0.0,
         hit_flash: 0.0,
+        chill_ttl: 0.0,
     });
 
     game.basic_attack();
@@ -255,6 +274,7 @@ fn fireball_explodes_and_hits_nearby_monsters() {
             attack_cd: 0.0,
             wobble: 0.0,
             hit_flash: 0.0,
+            chill_ttl: 0.0,
         },
         Monster {
             kind: MonsterKind::Slime,
@@ -267,6 +287,7 @@ fn fireball_explodes_and_hits_nearby_monsters() {
             attack_cd: 0.0,
             wobble: 0.0,
             hit_flash: 0.0,
+            chill_ttl: 0.0,
         },
         Monster {
             kind: MonsterKind::Brute,
@@ -279,17 +300,19 @@ fn fireball_explodes_and_hits_nearby_monsters() {
             attack_cd: 0.0,
             wobble: 0.0,
             hit_flash: 0.0,
+            chill_ttl: 0.0,
         },
     ];
     game.player.facing = Vec2::X;
 
-    game.cast_fireball();
+    game.cast_ability(AbilityKind::Fireball);
     game.update_projectiles(FIXED_DT);
 
     assert!(game.projectiles.is_empty());
     assert!(game.monsters[0].hp < 80.0);
     assert!(game.monsters[1].hp < 80.0);
     assert_eq!(game.monsters[2].hp, 80.0);
+    assert_eq!(game.player.disciplines.magic.xp, 4);
 }
 
 #[test]
@@ -303,6 +326,7 @@ fn basic_attack_spawns_a_short_slash_arc() {
     assert_eq!(game.slash_arcs[0].direction, Vec2::X);
     assert_eq!(game.slash_arcs[0].radius, 34.0);
     assert_eq!(game.slash_arcs[0].ttl, 0.16);
+    assert_eq!(game.player.disciplines.melee.xp, 0);
 }
 
 #[test]
@@ -320,12 +344,14 @@ fn hitting_monster_sets_flash_and_recoil() {
         attack_cd: 0.0,
         wobble: 0.0,
         hit_flash: 0.0,
+        chill_ttl: 0.0,
     }];
 
     game.basic_attack();
 
     assert!(game.monsters[0].hit_flash > 0.0);
     assert!(game.monsters[0].hit_offset.x > 0.0);
+    assert_eq!(game.player.disciplines.melee.xp, 2);
 }
 
 #[test]
@@ -343,6 +369,7 @@ fn cleave_hits_front_arc_without_hitting_behind() {
             attack_cd: 0.0,
             wobble: 0.0,
             hit_flash: 0.0,
+            chill_ttl: 0.0,
         },
         Monster {
             kind: MonsterKind::Slime,
@@ -355,28 +382,263 @@ fn cleave_hits_front_arc_without_hitting_behind() {
             attack_cd: 0.0,
             wobble: 0.0,
             hit_flash: 0.0,
+            chill_ttl: 0.0,
         },
     ];
     game.player.facing = Vec2::X;
 
-    game.cast_cleave();
+    game.cast_ability(AbilityKind::Cleave);
 
     assert!(game.monsters[0].hp < 80.0);
     assert_eq!(game.monsters[1].hp, 80.0);
 }
 
 #[test]
-fn skill_book_spends_points_on_selected_skill() {
+fn new_game_starts_with_only_starter_abilities_bound() {
     let mut game = Game::new(9);
-    game.player.stats.unspent_skill_points = 1;
-    game.skill_book_cursor = 2;
-    let starting_rank = game.player.fireball_rank;
-    game.input.inventory_equip_pressed = true;
+    assert_eq!(
+        game.player.bound_abilities,
+        [AbilityKind::Cleave, AbilityKind::Fireball]
+    );
+    assert!(game.player.is_ability_unlocked(AbilityKind::Cleave));
+    assert!(game.player.is_ability_unlocked(AbilityKind::Fireball));
+    assert!(!game.player.is_ability_unlocked(AbilityKind::Rush));
+    assert!(!game.player.is_ability_unlocked(AbilityKind::Nova));
 
+    game.cast_ability(AbilityKind::Rush);
+    game.cast_ability(AbilityKind::Nova);
+    assert_eq!(
+        game.player.ability_cooldowns[AbilityKind::Rush.index()],
+        0.0
+    );
+    assert_eq!(
+        game.player.ability_cooldowns[AbilityKind::Nova.index()],
+        0.0
+    );
+}
+
+#[test]
+fn discipline_levels_unlock_combat_abilities() {
+    let mut game = Game::new(13);
+
+    game.award_discipline_xp(DisciplineKind::Melee, 24);
+    game.award_discipline_xp(DisciplineKind::Magic, 24);
+
+    assert!(game.player.is_ability_unlocked(AbilityKind::Rush));
+    assert!(game.player.is_ability_unlocked(AbilityKind::Nova));
+    assert!(
+        game.log
+            .iter()
+            .any(|line| line.contains("Melee unlocks Rush"))
+    );
+    assert!(
+        game.log
+            .iter()
+            .any(|line| line.contains("Magic unlocks Nova"))
+    );
+}
+
+#[test]
+fn discipline_xp_can_cross_multiple_levels_at_once() {
+    let mut game = Game::new(17);
+
+    game.award_discipline_xp(DisciplineKind::Melee, 100);
+
+    assert_eq!(game.player.disciplines.melee.level, 3);
+    assert_eq!(game.player.disciplines.melee.xp, 36);
+    assert_eq!(game.player.disciplines.melee.next_xp, 88);
+}
+
+#[test]
+fn binding_skills_replaces_and_swaps_slots_without_duplicates() {
+    let mut game = Game::new(18);
+    game.award_discipline_xp(DisciplineKind::Melee, 24);
+
+    game.bind_ability(0, AbilityKind::Rush);
+    assert_eq!(
+        game.player.bound_abilities,
+        [AbilityKind::Rush, AbilityKind::Fireball]
+    );
+
+    game.bind_ability(1, AbilityKind::Rush);
+    assert_eq!(
+        game.player.bound_abilities,
+        [AbilityKind::Fireball, AbilityKind::Rush]
+    );
+}
+
+#[test]
+fn locked_skills_cannot_be_bound() {
+    let mut game = Game::new(24);
+
+    game.bind_ability(0, AbilityKind::Meteor);
+
+    assert_eq!(
+        game.player.bound_abilities,
+        [AbilityKind::Cleave, AbilityKind::Fireball]
+    );
+}
+
+#[test]
+fn skill_book_navigation_moves_between_columns_and_prefers_useful_skills() {
+    let mut game = Game::new(25);
+    game.award_discipline_xp(DisciplineKind::Melee, 24);
+
+    assert_eq!(game.skill_book_focus, SkillBookFocus::Disciplines);
+    game.input.nav_right_pressed = true;
     game.update_skill_book_controls();
+    assert_eq!(game.skill_book_focus, SkillBookFocus::Skills);
 
-    assert_eq!(game.player.fireball_rank, starting_rank + 1);
-    assert_eq!(game.player.stats.unspent_skill_points, 0);
+    game.input = InputState::default();
+    game.input.inventory_down_pressed = true;
+    game.update_skill_book_controls();
+    assert_eq!(game.skill_book_ability_cursor, 1);
+
+    game.input = InputState::default();
+    game.input.nav_right_pressed = true;
+    game.update_skill_book_controls();
+    assert_eq!(game.skill_book_focus, SkillBookFocus::Detail);
+
+    game.input = InputState::default();
+    game.input.nav_left_pressed = true;
+    game.update_skill_book_controls();
+    game.input = InputState::default();
+    game.input.nav_left_pressed = true;
+    game.update_skill_book_controls();
+    assert_eq!(game.skill_book_focus, SkillBookFocus::Disciplines);
+
+    game.skill_book_cursor = 1;
+    game.skill_book_ability_cursor = 0;
+    game.input = InputState::default();
+    game.input.inventory_up_pressed = true;
+    game.update_skill_book_controls();
+    assert_eq!(game.skill_book_cursor, 0);
+    assert_eq!(game.skill_book_ability_cursor, 1);
+}
+
+#[test]
+fn melee_and_magic_unlocks_reach_levels_four_and_eight() {
+    let mut game = Game::new(19);
+    game.award_discipline_xp(DisciplineKind::Melee, 2_000);
+    game.award_discipline_xp(DisciplineKind::Magic, 2_000);
+
+    assert!(game.player.is_ability_unlocked(AbilityKind::Whirlwind));
+    assert!(game.player.is_ability_unlocked(AbilityKind::Execute));
+    assert!(game.player.is_ability_unlocked(AbilityKind::IceBolt));
+    assert!(game.player.is_ability_unlocked(AbilityKind::Meteor));
+}
+
+#[test]
+fn whirlwind_hits_nearby_enemies() {
+    let mut game = Game::new(20);
+    game.player.disciplines.melee.level = 4;
+    game.monsters = vec![
+        test_monster(MonsterKind::Imp, game.player.pos + vec2(24.0, 0.0)),
+        test_monster(MonsterKind::Slime, game.player.pos + vec2(-24.0, 0.0)),
+    ];
+
+    game.cast_ability(AbilityKind::Whirlwind);
+
+    assert!(game.monsters.iter().all(|monster| monster.hp < 80.0));
+}
+
+#[test]
+fn execute_hits_harder_against_wounded_targets() {
+    let mut game = Game::new(21);
+    game.player.disciplines.melee.level = 8;
+    game.player.facing = Vec2::X;
+    game.monsters = vec![test_monster(
+        MonsterKind::Imp,
+        game.player.pos + vec2(32.0, 0.0),
+    )];
+    game.monsters[0].hp = 30.0;
+
+    game.cast_ability(AbilityKind::Execute);
+
+    assert!(game.monsters.is_empty() || game.monsters[0].hp < 12.0);
+}
+
+#[test]
+fn ice_bolt_chills_the_first_enemy_hit() {
+    let mut game = Game::new(22);
+    game.player.disciplines.magic.level = 4;
+    game.player.facing = Vec2::X;
+    game.monsters = vec![test_monster(
+        MonsterKind::Imp,
+        game.player.pos + vec2(32.0, 0.0),
+    )];
+
+    game.cast_ability(AbilityKind::IceBolt);
+    game.update_projectiles(FIXED_DT);
+
+    assert!(game.monsters[0].chill_ttl > 0.0);
+}
+
+#[test]
+fn meteor_waits_then_hits_its_target_area() {
+    let mut game = Game::new(23);
+    game.player.disciplines.magic.level = 8;
+    game.input.aim_world = game.player.pos + vec2(40.0, 0.0);
+    game.monsters = vec![test_monster(MonsterKind::Imp, game.input.aim_world)];
+
+    game.cast_ability(AbilityKind::Meteor);
+    assert_eq!(game.meteors.len(), 1);
+    assert_eq!(game.monsters[0].hp, 80.0);
+
+    game.update_meteors(0.73);
+
+    assert!(game.meteors.is_empty());
+    assert!(game.monsters.is_empty() || game.monsters[0].hp < 80.0);
+}
+
+#[test]
+fn armor_mastery_gains_xp_when_damage_is_mitigated() {
+    let mut game = Game::new(14);
+    game.monsters = vec![Monster {
+        kind: MonsterKind::Imp,
+        pos: game.player.pos + vec2(12.0, 0.0),
+        vel: Vec2::ZERO,
+        hit_offset: Vec2::ZERO,
+        hp: 24.0,
+        max_hp: 24.0,
+        level: 1,
+        attack_cd: 0.0,
+        wobble: 0.0,
+        hit_flash: 0.0,
+        chill_ttl: 0.0,
+    }];
+
+    game.update_monsters(FIXED_DT);
+
+    assert_eq!(game.player.disciplines.armor.xp, 2);
+}
+
+#[test]
+fn agility_mastery_gains_xp_from_actual_travel() {
+    let mut game = Game::new(15);
+    game.agility_distance_bank = 143.9;
+    game.input.movement = Vec2::X;
+
+    game.fixed_update(FIXED_DT);
+
+    assert_eq!(game.player.disciplines.agility.xp, 1);
+}
+
+#[test]
+fn mastery_levels_improve_combat_and_movement_values() {
+    let mut game = Game::new(16);
+    let base_armor = game.player.armor();
+    let base_speed = game.player.move_speed();
+
+    game.award_discipline_xp(DisciplineKind::Melee, 24);
+    game.award_discipline_xp(DisciplineKind::Magic, 24);
+    game.award_discipline_xp(DisciplineKind::Armor, 24);
+    game.award_discipline_xp(DisciplineKind::Agility, 24);
+
+    assert_eq!(game.player.melee_damage_bonus(), 2);
+    assert_eq!(game.player.magic_damage_bonus(), 2);
+    assert_eq!(game.player.armor(), base_armor + 1);
+    assert_eq!(game.player.move_speed(), base_speed + 6.0);
 }
 
 #[test]
@@ -404,9 +666,9 @@ fn every_ui_window_supports_basic_navigation() {
     game.input.skill_book_toggle_pressed = true;
     game.fixed_update(FIXED_DT);
     assert_eq!(game.ui_mode, UiMode::SkillBook);
-    game.input.inventory_down_pressed = true;
+    game.input.nav_right_pressed = true;
     game.fixed_update(FIXED_DT);
-    assert_eq!(game.skill_book_cursor, 1);
+    assert_eq!(game.skill_book_focus, SkillBookFocus::Skills);
 
     game.ui_mode = UiMode::None;
     game.input = InputState::default();

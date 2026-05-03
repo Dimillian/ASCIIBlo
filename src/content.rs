@@ -146,7 +146,7 @@ impl NpcKind {
     pub fn greeting(self) -> &'static str {
         match self {
             NpcKind::Merchant => "Steel, charms, and honest prices. Mostly honest.",
-            NpcKind::Trainer => "A level is only potential until you spend it.",
+            NpcKind::Trainer => "Practice is what turns motion into mastery.",
             NpcKind::Wayfinder => "Roads remember where your boots have been.",
         }
     }

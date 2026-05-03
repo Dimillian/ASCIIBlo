@@ -7,11 +7,38 @@ use crate::{
 };
 
 use super::{
-    FloatingText, Game, Loot, MONSTER_RADIUS, Monster, PASSIVE_AGGRO_RADIUS, PLAYER_RADIUS,
-    Particle, Projectile, Pulse, SlashArc,
+    AbilityKind, DisciplineKind, FloatingText, Game, Loot, MONSTER_RADIUS, MeteorStrike, Monster,
+    PASSIVE_AGGRO_RADIUS, PLAYER_RADIUS, Particle, Projectile, Pulse, SlashArc,
 };
 
+#[derive(Clone, Copy)]
+enum DamageKind {
+    Basic,
+    PhysicalSkill,
+    MagicSkill,
+}
+
 impl Game {
+    pub(super) fn cast_ability(&mut self, ability: AbilityKind) {
+        if !self.player.is_ability_unlocked(ability)
+            || self.player.ability_cooldowns[ability.index()] > 0.0
+            || self.player.mana < ability.mana_cost()
+        {
+            return;
+        }
+
+        match ability {
+            AbilityKind::Cleave => self.cast_cleave(),
+            AbilityKind::Rush => self.cast_rush(),
+            AbilityKind::Whirlwind => self.cast_whirlwind(),
+            AbilityKind::Execute => self.cast_execute(),
+            AbilityKind::Fireball => self.cast_fireball(),
+            AbilityKind::Nova => self.cast_nova(),
+            AbilityKind::IceBolt => self.cast_ice_bolt(),
+            AbilityKind::Meteor => self.cast_meteor(),
+        }
+    }
+
     pub(super) fn basic_attack(&mut self) {
         if self.player.attack_cd > 0.0 {
             return;
@@ -38,8 +65,9 @@ impl Game {
             .min_by(|a, b| a.1.total_cmp(&b.1))
             .map(|(index, _)| index);
         if let Some(index) = target {
-            let damage = self.roll_player_damage(false);
+            let damage = self.roll_player_damage(DamageKind::Basic);
             self.hit_monster(index, damage, false);
+            self.award_discipline_xp(DisciplineKind::Melee, 2);
         } else {
             self.log("You carve only air.".into());
         }
@@ -47,11 +75,7 @@ impl Game {
     }
 
     pub(super) fn cast_rush(&mut self) {
-        if self.player.rush_cd > 0.0 || self.player.mana < 8.0 {
-            return;
-        }
-        self.player.mana -= 8.0;
-        self.player.rush_cd = 1.8;
+        self.spend_ability_cost(AbilityKind::Rush);
         let direction = self.player.facing;
         let mut travelled = Vec2::ZERO;
         for _ in 0..10 {
@@ -82,18 +106,18 @@ impl Game {
         if hits.is_empty() {
             self.log("Rush snaps the grass flat.".into());
         }
+        let landed = !hits.is_empty();
         for index in hits.into_iter().rev() {
-            let damage = self.roll_player_damage(true) + 6.0 + self.player.rush_rank as f32 * 2.0;
+            let damage = self.roll_player_damage(DamageKind::PhysicalSkill) + 6.0;
             self.hit_monster(index, damage, true);
+        }
+        if landed {
+            self.award_discipline_xp(DisciplineKind::Melee, 4);
         }
     }
 
     pub(super) fn cast_nova(&mut self) {
-        if self.player.nova_cd > 0.0 || self.player.mana < 14.0 {
-            return;
-        }
-        self.player.mana -= 14.0;
-        self.player.nova_cd = 3.5;
+        self.spend_ability_cost(AbilityKind::Nova);
         self.pulses.push(Pulse {
             pos: self.player.pos,
             radius: 18.0,
@@ -112,27 +136,28 @@ impl Game {
         if hits.is_empty() {
             self.log("Nova blooms with nobody close enough to regret it.".into());
         }
+        let landed = !hits.is_empty();
         for index in hits.into_iter().rev() {
-            let damage = self.roll_player_damage(true) + 3.0 + self.player.nova_rank as f32 * 2.0;
+            let damage = self.roll_player_damage(DamageKind::MagicSkill) + 3.0;
             self.hit_monster(index, damage, true);
+        }
+        if landed {
+            self.award_discipline_xp(DisciplineKind::Magic, 4);
         }
     }
 
     pub(super) fn cast_fireball(&mut self) {
-        if self.player.fireball_cd > 0.0 || self.player.mana < 12.0 {
-            return;
-        }
-        self.player.mana -= 12.0;
-        self.player.fireball_cd = 1.2;
+        self.spend_ability_cost(AbilityKind::Fireball);
         let direction = self.player.facing.normalize_or_zero();
-        let damage = self.roll_player_damage(true) + 8.0 + self.player.fireball_rank as f32 * 2.0;
+        let damage = self.roll_player_damage(DamageKind::MagicSkill) + 8.0;
         self.projectiles.push(Projectile {
+            ability: AbilityKind::Fireball,
             pos: self.player.pos + direction * 20.0,
             vel: direction * 320.0,
             ttl: 0.95,
             radius: 7.0,
             damage,
-            aoe_radius: 34.0 + self.player.fireball_rank as f32 * 3.0,
+            aoe_radius: 34.0,
             color: Color::from_rgba(255, 132, 64, 255),
         });
         self.spawn_particles(
@@ -143,11 +168,7 @@ impl Game {
     }
 
     pub(super) fn cast_cleave(&mut self) {
-        if self.player.cleave_cd > 0.0 || self.player.mana < 10.0 {
-            return;
-        }
-        self.player.mana -= 10.0;
-        self.player.cleave_cd = 2.2;
+        self.spend_ability_cost(AbilityKind::Cleave);
         self.pulses.push(Pulse {
             pos: self.player.pos,
             radius: 18.0,
@@ -178,10 +199,102 @@ impl Game {
         if hits.is_empty() {
             self.log("Cleave whistles through empty air.".into());
         }
+        let landed = !hits.is_empty();
         for index in hits.into_iter().rev() {
-            let damage = self.roll_player_damage(true) + 5.0 + self.player.cleave_rank as f32 * 2.0;
+            let damage = self.roll_player_damage(DamageKind::PhysicalSkill) + 5.0;
             self.hit_monster(index, damage, true);
         }
+        if landed {
+            self.award_discipline_xp(DisciplineKind::Melee, 4);
+        }
+    }
+
+    pub(super) fn cast_whirlwind(&mut self) {
+        self.spend_ability_cost(AbilityKind::Whirlwind);
+        self.pulses.push(Pulse {
+            pos: self.player.pos,
+            radius: 18.0,
+            ttl: 0.38,
+            color: Color::from_rgba(255, 176, 88, 255),
+        });
+        self.spawn_particles(self.player.pos, 20, Color::from_rgba(255, 176, 88, 255));
+        let hits: Vec<usize> = self
+            .monsters
+            .iter()
+            .enumerate()
+            .filter_map(|(index, monster)| {
+                (monster.pos.distance(self.player.pos) <= 76.0).then_some(index)
+            })
+            .collect();
+        if hits.is_empty() {
+            self.log("Whirlwind spins up only dust.".into());
+        }
+        let landed = !hits.is_empty();
+        for index in hits.into_iter().rev() {
+            let damage = self.roll_player_damage(DamageKind::PhysicalSkill) + 7.0;
+            self.hit_monster(index, damage, true);
+        }
+        if landed {
+            self.award_discipline_xp(DisciplineKind::Melee, 5);
+        }
+    }
+
+    pub(super) fn cast_execute(&mut self) {
+        self.spend_ability_cost(AbilityKind::Execute);
+        let direction = self.player.facing.normalize_or_zero();
+        let target = self
+            .monsters
+            .iter()
+            .enumerate()
+            .filter_map(|(index, monster)| {
+                let to_monster = monster.pos - self.player.pos;
+                let distance = to_monster.length();
+                let aligned = to_monster.normalize_or_zero().dot(direction);
+                (distance <= 64.0 && aligned > 0.45).then_some((index, distance))
+            })
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(index, _)| index);
+        if let Some(index) = target {
+            let wounded_bonus = if self.monsters[index].hp <= self.monsters[index].max_hp * 0.5 {
+                12.0
+            } else {
+                0.0
+            };
+            let damage = self.roll_player_damage(DamageKind::PhysicalSkill) + 10.0 + wounded_bonus;
+            self.hit_monster(index, damage, true);
+            self.award_discipline_xp(DisciplineKind::Melee, 5);
+        } else {
+            self.log("Execute finds no opening.".into());
+        }
+    }
+
+    pub(super) fn cast_ice_bolt(&mut self) {
+        self.spend_ability_cost(AbilityKind::IceBolt);
+        let direction = self.player.facing.normalize_or_zero();
+        let damage = self.roll_player_damage(DamageKind::MagicSkill) + 6.0;
+        self.projectiles.push(Projectile {
+            ability: AbilityKind::IceBolt,
+            pos: self.player.pos + direction * 20.0,
+            vel: direction * 380.0,
+            ttl: 0.8,
+            radius: 6.0,
+            damage,
+            aoe_radius: 0.0,
+            color: Color::from_rgba(128, 214, 255, 255),
+        });
+    }
+
+    pub(super) fn cast_meteor(&mut self) {
+        self.spend_ability_cost(AbilityKind::Meteor);
+        let pos = self.input.aim_world;
+        let damage = self.roll_player_damage(DamageKind::MagicSkill) + 14.0;
+        self.meteors.push(MeteorStrike {
+            pos,
+            ttl: 0.72,
+            damage,
+            radius: 62.0,
+        });
+        self.log("The air buckles above the target.".into());
     }
 
     pub(super) fn update_projectiles(&mut self, dt: f32) {
@@ -207,7 +320,28 @@ impl Game {
         }
         self.projectiles = active;
         for projectile in impacts {
-            self.detonate_fireball(projectile);
+            match projectile.ability {
+                AbilityKind::Fireball => self.detonate_fireball(projectile),
+                AbilityKind::IceBolt => self.impact_ice_bolt(projectile),
+                _ => {}
+            }
+        }
+    }
+
+    pub(super) fn update_meteors(&mut self, dt: f32) {
+        let mut pending = Vec::with_capacity(self.meteors.len());
+        let mut impacts = Vec::new();
+        for mut meteor in self.meteors.drain(..) {
+            meteor.ttl -= dt;
+            if meteor.ttl <= 0.0 {
+                impacts.push(meteor);
+            } else {
+                pending.push(meteor);
+            }
+        }
+        self.meteors = pending;
+        for meteor in impacts {
+            self.impact_meteor(meteor);
         }
     }
 
@@ -230,8 +364,56 @@ impl Game {
         if hits.is_empty() {
             self.log("Fireball blooms against the ground.".into());
         }
+        let landed = !hits.is_empty();
         for index in hits.into_iter().rev() {
             self.hit_monster(index, projectile.damage, true);
+        }
+        if landed {
+            self.award_discipline_xp(DisciplineKind::Magic, 4);
+        }
+    }
+
+    fn impact_ice_bolt(&mut self, projectile: Projectile) {
+        let target = self
+            .monsters
+            .iter()
+            .enumerate()
+            .find(|(_, monster)| monster.pos.distance(projectile.pos) <= projectile.radius + 12.0)
+            .map(|(index, _)| index);
+        if let Some(index) = target {
+            self.monsters[index].chill_ttl = self.monsters[index].chill_ttl.max(1.8);
+            self.hit_monster(index, projectile.damage, true);
+            self.award_discipline_xp(DisciplineKind::Magic, 4);
+        } else {
+            self.log("Ice Bolt cracks against the ground.".into());
+        }
+    }
+
+    fn impact_meteor(&mut self, meteor: MeteorStrike) {
+        self.pulses.push(Pulse {
+            pos: meteor.pos,
+            radius: 20.0,
+            ttl: 0.48,
+            color: Color::from_rgba(255, 132, 64, 255),
+        });
+        self.spawn_particles(meteor.pos, 28, Color::from_rgba(255, 132, 64, 255));
+        let hits: Vec<usize> = self
+            .monsters
+            .iter()
+            .enumerate()
+            .filter_map(|(index, monster)| {
+                (monster.pos.distance(meteor.pos) <= meteor.radius).then_some(index)
+            })
+            .collect();
+        if hits.is_empty() {
+            self.log("Meteor hammers empty ground.".into());
+        }
+        let landed = !hits.is_empty();
+        for index in hits.into_iter().rev() {
+            self.hit_monster(index, meteor.damage, true);
+        }
+        if landed {
+            self.award_discipline_xp(DisciplineKind::Magic, 6);
         }
     }
 
@@ -243,6 +425,7 @@ impl Game {
             monster.attack_cd = (monster.attack_cd - dt).max(0.0);
             monster.wobble += dt * 5.0;
             monster.hit_flash = (monster.hit_flash - dt).max(0.0);
+            monster.chill_ttl = (monster.chill_ttl - dt).max(0.0);
             monster.hit_offset *= 0.0003_f32.powf(dt);
             let to_player = player_pos - monster.pos;
             let distance = to_player.length();
@@ -252,7 +435,9 @@ impl Game {
                 continue;
             }
             if distance < PASSIVE_AGGRO_RADIUS {
-                monster.vel = to_player.normalize_or_zero() * monster.kind.move_speed();
+                let chill_factor = if monster.chill_ttl > 0.0 { 0.55 } else { 1.0 };
+                monster.vel =
+                    to_player.normalize_or_zero() * monster.kind.move_speed() * chill_factor;
             } else {
                 monster.vel *= 0.88;
             }
@@ -281,6 +466,9 @@ impl Game {
             let raw = monster_damage(self.monsters[index].kind, self.monsters[index].level)
                 + self.rng.random_range(-2.0..=3.0);
             let damage = (raw - self.player.armor() as f32).max(1.0);
+            if damage < raw {
+                self.award_discipline_xp(DisciplineKind::Armor, 2);
+            }
             self.player.hp -= damage;
             self.floating.push(FloatingText {
                 pos: self.player.pos,
@@ -303,10 +491,17 @@ impl Game {
         }
     }
 
-    fn roll_player_damage(&mut self, skill: bool) -> f32 {
+    fn roll_player_damage(&mut self, kind: DamageKind) -> f32 {
         let crit = self.rng.random_bool(self.player.crit_chance() as f64);
         let base = self.player.power() as f32 + self.rng.random_range(3.0..=8.0);
-        let skill_bonus = if skill { 4.0 } else { 0.0 };
+        let discipline_bonus = match kind {
+            DamageKind::Basic | DamageKind::PhysicalSkill => self.player.melee_damage_bonus(),
+            DamageKind::MagicSkill => self.player.magic_damage_bonus(),
+        } as f32;
+        let skill_bonus = match kind {
+            DamageKind::Basic => 0.0,
+            DamageKind::PhysicalSkill | DamageKind::MagicSkill => 4.0,
+        };
         if crit {
             self.floating.push(FloatingText {
                 pos: self.player.pos + vec2(0.0, -18.0),
@@ -314,10 +509,15 @@ impl Game {
                 color: Color::from_rgba(255, 224, 96, 255),
                 ttl: 0.72,
             });
-            (base + skill_bonus) * 2.0
+            (base + discipline_bonus + skill_bonus) * 2.0
         } else {
-            base + skill_bonus
+            base + discipline_bonus + skill_bonus
         }
+    }
+
+    fn spend_ability_cost(&mut self, ability: AbilityKind) {
+        self.player.mana -= ability.mana_cost();
+        self.player.ability_cooldowns[ability.index()] = ability.cooldown();
     }
 
     fn hit_monster(&mut self, index: usize, damage: f32, flashy: bool) {
@@ -396,7 +596,6 @@ impl Game {
             self.player.stats.agility += 1;
             self.player.stats.vitality += 1;
             self.player.stats.unspent_stat_points += 3;
-            self.player.stats.unspent_skill_points += 1;
             self.player.hp = self.player.max_hp();
             self.player.mana = self.player.max_mana();
             self.pulses.push(Pulse {

@@ -416,6 +416,23 @@ impl Renderer {
     }
 
     fn draw_effects(&self, game: &Game, camera: Vec2) {
+        for meteor in &game.meteors {
+            let screen = world_to_screen(meteor.pos, camera);
+            let ratio = (meteor.ttl / 0.72).clamp(0.0, 1.0);
+            draw_circle_lines(
+                screen.x,
+                screen.y,
+                meteor.radius,
+                3.0,
+                with_alpha(Color::from_rgba(255, 132, 64, 255), 0.8 - ratio * 0.45),
+            );
+            draw_circle(
+                screen.x,
+                screen.y,
+                10.0 + (1.0 - ratio) * 8.0,
+                with_alpha(Color::from_rgba(255, 132, 64, 255), 0.18),
+            );
+        }
         for projectile in &game.projectiles {
             let screen = world_to_screen(projectile.pos, camera);
             let direction = projectile.vel.normalize_or_zero();

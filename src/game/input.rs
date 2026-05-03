@@ -7,10 +7,7 @@ pub(super) struct InputState {
     pub(super) movement: Vec2,
     pub(super) aim_world: Vec2,
     pub(super) attack_pressed: bool,
-    pub(super) rush_pressed: bool,
-    pub(super) nova_pressed: bool,
-    pub(super) fireball_pressed: bool,
-    pub(super) cleave_pressed: bool,
+    pub(super) ability_slot_pressed: [bool; 2],
     pub(super) pickup_pressed: bool,
     pub(super) inventory_toggle_pressed: bool,
     pub(super) character_toggle_pressed: bool,
@@ -48,10 +45,8 @@ impl Game {
         self.input.aim_world = aim_world;
         self.input.attack_pressed |=
             is_mouse_button_pressed(MouseButton::Left) || is_key_pressed(KeyCode::Space);
-        self.input.rush_pressed |= is_key_pressed(KeyCode::Key1);
-        self.input.nova_pressed |= is_key_pressed(KeyCode::Key2);
-        self.input.fireball_pressed |= is_key_pressed(KeyCode::Key3);
-        self.input.cleave_pressed |= is_key_pressed(KeyCode::Key4);
+        self.input.ability_slot_pressed[0] |= is_key_pressed(KeyCode::Key1);
+        self.input.ability_slot_pressed[1] |= is_key_pressed(KeyCode::Key2);
         self.input.pickup_pressed |= is_key_pressed(KeyCode::E);
         self.input.inventory_toggle_pressed |= is_key_pressed(KeyCode::Tab);
         self.input.character_toggle_pressed |= is_key_pressed(KeyCode::C);
@@ -93,10 +88,7 @@ impl Game {
 
     pub(super) fn clear_edge_inputs(&mut self) {
         self.input.attack_pressed = false;
-        self.input.rush_pressed = false;
-        self.input.nova_pressed = false;
-        self.input.fireball_pressed = false;
-        self.input.cleave_pressed = false;
+        self.input.ability_slot_pressed = [false; 2];
         self.input.pickup_pressed = false;
         self.input.inventory_toggle_pressed = false;
         self.input.character_toggle_pressed = false;

@@ -2,6 +2,7 @@ mod combat;
 mod input;
 mod inventory;
 mod menus;
+mod progression;
 mod spawning;
 mod types;
 
@@ -16,6 +17,7 @@ use crate::{
 };
 
 use input::InputState;
+use progression::discipline_next_xp;
 pub use types::*;
 
 pub const FIXED_DT: f32 = 1.0 / 60.0;
@@ -40,6 +42,9 @@ pub struct Game {
     pub pulses: Vec<Pulse>,
     pub slash_arcs: Vec<SlashArc>,
     pub projectiles: Vec<Projectile>,
+    pub meteors: Vec<MeteorStrike>,
+    pub skill_xp_toasts: Vec<SkillXpToast>,
+    pub notifications: Vec<Notification>,
     pub log: Vec<String>,
     pub log_scroll_offset: usize,
     pub known_tiles: HashSet<IVec2>,
@@ -47,6 +52,8 @@ pub struct Game {
     pub inventory_cursor: usize,
     pub character_cursor: usize,
     pub skill_book_cursor: usize,
+    pub skill_book_ability_cursor: usize,
+    pub skill_book_focus: SkillBookFocus,
     pub shop_cursor: usize,
     pub shop_tab: ShopTab,
     pub travel_cursor: usize,
@@ -54,6 +61,7 @@ pub struct Game {
     pub world_map: WorldMapState,
     pub screen_shake: f32,
     pub elapsed: f32,
+    pub agility_distance_bank: f32,
     pub preview_hover_world: Option<Vec2>,
     pub preview_hover_screen: Option<Vec2>,
     rng: StdRng,
@@ -74,10 +82,8 @@ impl Game {
                 hp: 92.0,
                 mana: 36.0,
                 attack_cd: 0.0,
-                rush_cd: 0.0,
-                nova_cd: 0.0,
-                fireball_cd: 0.0,
-                cleave_cd: 0.0,
+                ability_cooldowns: [0.0; 8],
+                bound_abilities: [AbilityKind::Cleave, AbilityKind::Fireball],
                 stats: Stats {
                     level: 1,
                     xp: 0,
@@ -87,7 +93,6 @@ impl Game {
                     vitality: 4,
                     gold: 0,
                     unspent_stat_points: 0,
-                    unspent_skill_points: 0,
                 },
                 inventory: starter_items(),
                 equipment: Equipment {
@@ -95,10 +100,28 @@ impl Game {
                     armor: None,
                     charm: None,
                 },
-                rush_rank: 1,
-                nova_rank: 1,
-                fireball_rank: 1,
-                cleave_rank: 1,
+                disciplines: Disciplines {
+                    melee: DisciplineProgress {
+                        level: 1,
+                        xp: 0,
+                        next_xp: discipline_next_xp(1),
+                    },
+                    magic: DisciplineProgress {
+                        level: 1,
+                        xp: 0,
+                        next_xp: discipline_next_xp(1),
+                    },
+                    armor: DisciplineProgress {
+                        level: 1,
+                        xp: 0,
+                        next_xp: discipline_next_xp(1),
+                    },
+                    agility: DisciplineProgress {
+                        level: 1,
+                        xp: 0,
+                        next_xp: discipline_next_xp(1),
+                    },
+                },
             },
             monsters: Vec::new(),
             npcs: vec![
@@ -121,6 +144,9 @@ impl Game {
             pulses: Vec::new(),
             slash_arcs: Vec::new(),
             projectiles: Vec::new(),
+            meteors: Vec::new(),
+            skill_xp_toasts: Vec::new(),
+            notifications: Vec::new(),
             log: vec!["The bell in Ember Town rings. Go make trouble.".into()],
             log_scroll_offset: 0,
             known_tiles: HashSet::new(),
@@ -128,6 +154,8 @@ impl Game {
             inventory_cursor: 0,
             character_cursor: 0,
             skill_book_cursor: 0,
+            skill_book_ability_cursor: 0,
+            skill_book_focus: SkillBookFocus::Disciplines,
             shop_cursor: 0,
             shop_tab: ShopTab::Buy,
             travel_cursor: 0,
@@ -138,6 +166,7 @@ impl Game {
             },
             screen_shake: 0.0,
             elapsed: 0.0,
+            agility_distance_bank: 0.0,
             preview_hover_world: None,
             preview_hover_screen: None,
             rng: StdRng::seed_from_u64(seed),
@@ -238,10 +267,9 @@ impl Game {
         }
 
         self.player.attack_cd = (self.player.attack_cd - dt).max(0.0);
-        self.player.rush_cd = (self.player.rush_cd - dt).max(0.0);
-        self.player.nova_cd = (self.player.nova_cd - dt).max(0.0);
-        self.player.fireball_cd = (self.player.fireball_cd - dt).max(0.0);
-        self.player.cleave_cd = (self.player.cleave_cd - dt).max(0.0);
+        for cooldown in &mut self.player.ability_cooldowns {
+            *cooldown = (*cooldown - dt).max(0.0);
+        }
         self.player.mana = (self.player.mana + dt * 4.0).min(self.player.max_mana());
 
         self.update_player_movement(dt);
@@ -249,23 +277,17 @@ impl Game {
         if self.input.attack_pressed {
             self.basic_attack();
         }
-        if self.input.rush_pressed {
-            self.cast_rush();
-        }
-        if self.input.nova_pressed {
-            self.cast_nova();
-        }
-        if self.input.fireball_pressed {
-            self.cast_fireball();
-        }
-        if self.input.cleave_pressed {
-            self.cast_cleave();
+        for slot in 0..self.player.bound_abilities.len() {
+            if self.input.ability_slot_pressed[slot] {
+                self.cast_ability(self.player.bound_abilities[slot]);
+            }
         }
         if self.input.pickup_pressed {
             self.pickup_loot();
         }
 
         self.update_projectiles(dt);
+        self.update_meteors(dt);
         self.update_monsters(dt);
         self.cull_distant_monsters();
         self.replenish_local_monsters();
@@ -297,6 +319,17 @@ impl Game {
             slash.radius += dt * 36.0;
         }
         self.slash_arcs.retain(|slash| slash.ttl > 0.0);
+
+        for toast in &mut self.skill_xp_toasts {
+            toast.ttl -= dt;
+        }
+        self.skill_xp_toasts.retain(|toast| toast.ttl > 0.0);
+
+        for notification in &mut self.notifications {
+            notification.ttl -= dt;
+        }
+        self.notifications
+            .retain(|notification| notification.ttl > 0.0);
 
         for loot in &mut self.loot {
             loot.bob += dt * 4.0;
@@ -340,6 +373,7 @@ impl Game {
     }
 
     fn update_player_movement(&mut self, dt: f32) {
+        let before = self.player.pos;
         let speed = self.player.move_speed();
         let desired = self.input.movement * speed;
         self.player.vel = self.player.vel.lerp(desired, 1.0 - 0.0002_f32.powf(dt));
@@ -349,6 +383,7 @@ impl Game {
             self.player.facing = self.player.vel.normalize();
         }
         self.move_with_collision(self.player.vel * dt);
+        self.award_agility_distance(self.player.pos.distance(before));
     }
 
     fn move_with_collision(&mut self, delta: Vec2) {

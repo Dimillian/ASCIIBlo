@@ -36,10 +36,16 @@ async fn main() {
         }
         PreviewRequest::None => {}
     }
-    if let PreviewRequest::Single { mode, .. } = &preview_request {
-        mode.configure(&mut game);
-    }
     let mut preview_runner = PreviewRunner::from_request(&preview_request);
+    match &preview_request {
+        PreviewRequest::Single { mode, .. } => mode.configure(&mut game),
+        PreviewRequest::All { .. } => {
+            if let Some(runner) = &preview_runner {
+                runner.current_mode().configure(&mut game);
+            }
+        }
+        PreviewRequest::None => {}
+    }
     let mut renderer = Renderer::new();
     let mut accumulator = 0.0;
     let mut rendered_frames = 0;

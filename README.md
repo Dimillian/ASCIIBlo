@@ -17,18 +17,19 @@ cargo run -- --preview inventory --output /tmp/asciiblo-inventory.png
 cargo run -- --preview-all /tmp/asciiblo-previews
 ```
 
-Available single-screen preview modes currently include `gameplay`, `pickup`, `inventory`, `character`, `world-map`, `shop-buy`, `shop-sell`, `trainer`, and `travel`.
+Available single-screen preview modes currently include `gameplay`, `pickup`, `inventory`, `character`, `skill-book`, `world-map`, `shop-buy`, `shop-sell`, `trainer`, and `travel`.
 
 Controls:
 
 - Move: `WASD`
 - Aim: mouse
 - Basic attack: left click or `Space`
-- Skills: `1` for Rush, `2` for Nova
+- Skills: `1` and `2` cast the two skills currently bound in the mastery screen
 - Pick up loot: `E`
 - Talk to NPCs: `F`
 - Inventory: `Tab`, then `Up` / `Down` to move, `Enter` to equip, `Backspace` to drop
-- Character sheet: `C`, then `Up` / `Down` and `Enter` to spend stat and skill points
+- Character sheet: `C`, then `Up` / `Down` and `Enter` to spend stat points
+- Mastery screen: `B`, then `Left` / `Right` for panels, `Up` / `Down` to move, and `1` / `2` to bind
 - World map: `M`, then `WASD` / arrow keys to pan, mouse wheel to zoom, `R` to recenter
 - Quit: `Esc`
 
@@ -39,7 +40,7 @@ The current slice includes:
 - An infinite deterministic overworld with repeated irregular biome provinces, generated from coordinates around a safe handcrafted town at the origin
 - Visible biome levels, a framed minimap, a discovered-world map, and fast travel through the town wayfinder
 - Monsters with different tempos, attacks, level scaling, biome-specific encounter tables, and hover target readouts
-- Loot, item inspection, rarity, gear bonuses, inventory, stats, XP, levels, spendable stat/skill points, gold
+- Loot, item inspection, rarity, gear bonuses, inventory, stats, XP, levels, spendable stat points, use-based mastery, gold
 - Town NPCs for training, buying, selling, and travel
 - Floating damage text, crits, particles, a compact combat feed, pickup feedback, skill bursts, and level-up fireworks
 - Dedicated modal UI for inventory, character progression, merchant buy/sell flows, trainer guidance, travel, and the world map

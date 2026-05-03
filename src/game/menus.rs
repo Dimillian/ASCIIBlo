@@ -52,37 +52,90 @@ impl Game {
     }
 
     pub(super) fn update_skill_book_controls(&mut self) {
-        if self.input.inventory_up_pressed {
-            self.skill_book_cursor = self.skill_book_cursor.saturating_sub(1);
+        if self.input.nav_left_pressed {
+            self.skill_book_focus = match self.skill_book_focus {
+                super::SkillBookFocus::Disciplines => super::SkillBookFocus::Disciplines,
+                super::SkillBookFocus::Skills => super::SkillBookFocus::Disciplines,
+                super::SkillBookFocus::Detail => super::SkillBookFocus::Skills,
+            };
         }
-        if self.input.inventory_down_pressed {
-            self.skill_book_cursor = (self.skill_book_cursor + 1).min(3);
+        if self.input.nav_right_pressed {
+            self.skill_book_focus = match self.skill_book_focus {
+                super::SkillBookFocus::Disciplines => super::SkillBookFocus::Skills,
+                super::SkillBookFocus::Skills => super::SkillBookFocus::Detail,
+                super::SkillBookFocus::Detail => super::SkillBookFocus::Detail,
+            };
         }
-        if self.input.inventory_equip_pressed && self.player.stats.unspent_skill_points > 0 {
-            match self.skill_book_cursor {
-                0 => {
-                    self.player.rush_rank += 1;
-                    self.log(format!("Rush reaches rank {}.", self.player.rush_rank));
+        let discipline = super::DisciplineKind::ALL[self.skill_book_cursor];
+        let abilities = super::abilities_for_discipline(discipline);
+        match self.skill_book_focus {
+            super::SkillBookFocus::Disciplines => {
+                let previous = self.skill_book_cursor;
+                if self.input.inventory_up_pressed {
+                    self.skill_book_cursor = self.skill_book_cursor.saturating_sub(1);
                 }
-                1 => {
-                    self.player.nova_rank += 1;
-                    self.log(format!("Nova reaches rank {}.", self.player.nova_rank));
+                if self.input.inventory_down_pressed {
+                    self.skill_book_cursor =
+                        (self.skill_book_cursor + 1).min(super::DisciplineKind::ALL.len() - 1);
                 }
-                2 => {
-                    self.player.fireball_rank += 1;
-                    self.log(format!(
-                        "Fireball reaches rank {}.",
-                        self.player.fireball_rank
-                    ));
+                if previous != self.skill_book_cursor {
+                    let discipline = super::DisciplineKind::ALL[self.skill_book_cursor];
+                    self.skill_book_ability_cursor = self.preferred_skill_index(discipline);
                 }
-                3 => {
-                    self.player.cleave_rank += 1;
-                    self.log(format!("Cleave reaches rank {}.", self.player.cleave_rank));
-                }
-                _ => {}
             }
-            self.player.stats.unspent_skill_points -= 1;
+            super::SkillBookFocus::Skills if !abilities.is_empty() => {
+                if self.input.inventory_up_pressed {
+                    self.skill_book_ability_cursor =
+                        self.skill_book_ability_cursor.saturating_sub(1);
+                }
+                if self.input.inventory_down_pressed {
+                    self.skill_book_ability_cursor =
+                        (self.skill_book_ability_cursor + 1).min(abilities.len() - 1);
+                }
+            }
+            _ => {}
         }
+        if !abilities.is_empty() {
+            let selected = abilities[self.skill_book_ability_cursor];
+            for slot in 0..self.input.ability_slot_pressed.len() {
+                if self.input.ability_slot_pressed[slot]
+                    && self.player.is_ability_unlocked(selected)
+                {
+                    self.bind_ability(slot, selected);
+                }
+            }
+        }
+    }
+
+    fn preferred_skill_index(&self, discipline: super::DisciplineKind) -> usize {
+        let abilities = super::abilities_for_discipline(discipline);
+        abilities
+            .iter()
+            .position(|ability| {
+                self.player.is_ability_unlocked(*ability)
+                    && self.player.bound_slot(*ability).is_none()
+            })
+            .or_else(|| {
+                abilities
+                    .iter()
+                    .position(|ability| self.player.is_ability_unlocked(*ability))
+            })
+            .unwrap_or(0)
+    }
+
+    pub(super) fn bind_ability(&mut self, slot: usize, ability: super::AbilityKind) {
+        if !self.player.is_ability_unlocked(ability) {
+            return;
+        }
+        if let Some(existing_slot) = self.player.bound_slot(ability) {
+            if existing_slot == slot {
+                return;
+            }
+            self.player.bound_abilities.swap(slot, existing_slot);
+        } else {
+            self.player.bound_abilities[slot] = ability;
+        }
+        self.log(format!("{} bound to {}.", ability.name(), slot + 1));
     }
 
     pub(super) fn update_world_map_controls(&mut self, dt: f32) {

@@ -4,7 +4,10 @@ use macroquad::prelude::{Vec2, ivec2};
 
 use crate::{
     content::{Item, Rarity, Slot},
-    game::{Game, Loot, Monster, ShopTab, UiMode},
+    game::{
+        AbilityKind, DisciplineKind, Game, Loot, Monster, Notification, ShopTab, SkillBookFocus,
+        SkillXpToast, UiMode,
+    },
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -73,8 +76,15 @@ impl PreviewMode {
         game.inventory_cursor = 0;
         game.character_cursor = 0;
         game.skill_book_cursor = 0;
+        game.skill_book_ability_cursor = 0;
+        game.skill_book_focus = SkillBookFocus::Disciplines;
         game.player.stats.unspent_stat_points = 0;
-        game.player.stats.unspent_skill_points = 0;
+        for kind in DisciplineKind::ALL {
+            let progress = game.player.disciplines.get_mut(kind);
+            progress.level = 1;
+            progress.xp = 0;
+            progress.next_xp = 24;
+        }
         game.ui_mode = UiMode::None;
         game.shop_tab = ShopTab::Buy;
         game.loot.clear();
@@ -83,13 +93,14 @@ impl PreviewMode {
         game.pulses.clear();
         game.slash_arcs.clear();
         game.projectiles.clear();
+        game.meteors.clear();
+        game.skill_xp_toasts.clear();
+        game.notifications.clear();
         game.player.hp = game.player.max_hp();
         game.player.mana = game.player.max_mana();
         game.player.attack_cd = 0.0;
-        game.player.rush_cd = 0.0;
-        game.player.nova_cd = 0.0;
-        game.player.fireball_cd = 0.0;
-        game.player.cleave_cd = 0.0;
+        game.player.ability_cooldowns = [0.0; 8];
+        game.player.bound_abilities = [AbilityKind::Cleave, AbilityKind::Fireball];
         game.log = vec!["The bell in Ember Town rings. Go make trouble.".into()];
         game.preview_hover_screen = Some(Vec2::new(-1_000.0, -1_000.0));
 
@@ -105,6 +116,21 @@ impl PreviewMode {
                     "Slime drops Swift Mace of Alacrity.".into(),
                     "Nothing close enough to pocket.".into(),
                 ];
+                game.skill_xp_toasts.push(SkillXpToast {
+                    kind: DisciplineKind::Melee,
+                    amount: 6,
+                    ttl: 2.4,
+                });
+                game.notifications.push(Notification {
+                    text: "Melee reaches level 2".into(),
+                    color: DisciplineKind::Melee.color(),
+                    ttl: 2.2,
+                });
+                game.notifications.push(Notification {
+                    text: "Unlocked Rush".into(),
+                    color: DisciplineKind::Melee.color(),
+                    ttl: 2.6,
+                });
                 game.monsters.clear();
                 game.monsters.push(Monster {
                     kind: crate::content::MonsterKind::Brute,
@@ -117,6 +143,7 @@ impl PreviewMode {
                     attack_cd: 0.0,
                     wobble: 0.0,
                     hit_flash: 0.0,
+                    chill_ttl: 0.0,
                 });
                 game.preview_hover_world = Some(game.player.pos + Vec2::new(42.0, 0.0));
             }
@@ -145,8 +172,14 @@ impl PreviewMode {
                 game.ui_mode = UiMode::Character;
             }
             PreviewMode::SkillBook => {
-                game.player.stats.unspent_skill_points = 1;
-                game.skill_book_cursor = 2;
+                game.player.disciplines.melee.xp = 18;
+                game.player.disciplines.magic.level = 8;
+                game.player.disciplines.magic.xp = 12;
+                game.player.disciplines.magic.next_xp = 808;
+                game.player.bound_abilities = [AbilityKind::Fireball, AbilityKind::Meteor];
+                game.skill_book_cursor = 1;
+                game.skill_book_ability_cursor = 2;
+                game.skill_book_focus = SkillBookFocus::Skills;
                 game.ui_mode = UiMode::SkillBook;
             }
             PreviewMode::WorldMap => {
@@ -304,7 +337,8 @@ mod tests {
 
         PreviewMode::SkillBook.configure(&mut game);
         assert_eq!(game.ui_mode, UiMode::SkillBook);
-        assert_eq!(game.skill_book_cursor, 2);
+        assert_eq!(game.skill_book_cursor, 1);
+        assert_eq!(game.skill_book_focus, SkillBookFocus::Skills);
 
         PreviewMode::Travel.configure(&mut game);
         assert_eq!(game.ui_mode, UiMode::Travel);
