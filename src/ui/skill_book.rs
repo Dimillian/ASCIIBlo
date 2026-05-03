@@ -453,9 +453,11 @@ fn current_bonus(game: &Game, kind: DisciplineKind) -> String {
             "+{} physical damage on basic attacks and melee skills.",
             game.player.melee_damage_bonus()
         ),
-        DisciplineKind::Magic => {
-            format!("+{} spell damage.", game.player.magic_damage_bonus())
-        }
+        DisciplineKind::Magic => format!(
+            "+{} spell damage. +{:.1} mana/sec regeneration.",
+            game.player.magic_damage_bonus(),
+            game.player.magic_regen_bonus()
+        ),
         DisciplineKind::Armor => format!(
             "+{} effective armor from mastery.",
             game.player.armor_mastery_bonus()

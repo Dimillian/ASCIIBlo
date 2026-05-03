@@ -86,7 +86,7 @@ pub(crate) fn draw(game: &Game) {
                 game.player.mana.round() as i32,
                 game.player.max_mana().round() as i32
             ),
-            detail: "Mana fuels active skills. Maximum mana rises with level and slowly regenerates over time."
+            detail: "Mana fuels active skills. Maximum mana rises with level, while Magic mastery improves regeneration."
                 .into(),
             cursor_index: None,
         },

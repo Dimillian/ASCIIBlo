@@ -629,6 +629,7 @@ fn mastery_levels_improve_combat_and_movement_values() {
     let mut game = Game::new(16);
     let base_armor = game.player.armor();
     let base_speed = game.player.move_speed();
+    let base_mana_regen = game.player.mana_regen_rate();
 
     game.award_discipline_xp(DisciplineKind::Melee, 24);
     game.award_discipline_xp(DisciplineKind::Magic, 24);
@@ -637,8 +638,23 @@ fn mastery_levels_improve_combat_and_movement_values() {
 
     assert_eq!(game.player.melee_damage_bonus(), 2);
     assert_eq!(game.player.magic_damage_bonus(), 2);
+    assert_eq!(game.player.mana_regen_rate(), base_mana_regen + 0.5);
     assert_eq!(game.player.armor(), base_armor + 1);
     assert_eq!(game.player.move_speed(), base_speed + 6.0);
+}
+
+#[test]
+fn mana_regenerates_more_slowly_at_first_and_scales_with_magic_mastery() {
+    let mut novice = Game::new(26);
+    novice.player.mana = 0.0;
+    novice.fixed_update(1.0);
+    assert_eq!(novice.player.mana, 3.0);
+
+    let mut mage = Game::new(27);
+    mage.player.mana = 0.0;
+    mage.player.disciplines.magic.level = 4;
+    mage.fixed_update(1.0);
+    assert_eq!(mage.player.mana, 4.5);
 }
 
 #[test]

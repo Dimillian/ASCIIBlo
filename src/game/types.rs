@@ -297,6 +297,14 @@ impl Player {
         (self.disciplines.magic.level - 1).max(0) * 2
     }
 
+    pub fn magic_regen_bonus(&self) -> f32 {
+        (self.disciplines.magic.level - 1).max(0) as f32 * 0.5
+    }
+
+    pub fn mana_regen_rate(&self) -> f32 {
+        3.0 + self.magic_regen_bonus()
+    }
+
     pub fn armor_mastery_bonus(&self) -> i32 {
         (self.disciplines.armor.level - 1).max(0)
     }

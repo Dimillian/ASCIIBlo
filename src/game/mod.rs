@@ -270,7 +270,8 @@ impl Game {
         for cooldown in &mut self.player.ability_cooldowns {
             *cooldown = (*cooldown - dt).max(0.0);
         }
-        self.player.mana = (self.player.mana + dt * 4.0).min(self.player.max_mana());
+        self.player.mana =
+            (self.player.mana + dt * self.player.mana_regen_rate()).min(self.player.max_mana());
 
         self.update_player_movement(dt);
         self.reveal_around_tile(World::world_to_tile(self.player.pos), EXPLORATION_RADIUS);
