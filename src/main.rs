@@ -54,6 +54,7 @@ async fn main() {
         let frame_dt = get_frame_time().min(0.1);
         accumulator += frame_dt;
 
+        game.set_spawn_visibility_viewport(vec2(screen_width(), screen_height()));
         game.collect_input(renderer.screen_to_world(mouse_position().into()));
         while accumulator >= FIXED_DT {
             game.fixed_update(FIXED_DT);

@@ -109,6 +109,17 @@ pub enum MonsterKind {
     Slime,
     Brute,
     Wisp,
+    Hound,
+    Beetle,
+    Cinderling,
+    Revenant,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MonsterRank {
+    Normal,
+    Elite,
+    Boss,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -159,6 +170,10 @@ impl MonsterKind {
             MonsterKind::Slime => 's',
             MonsterKind::Brute => 'B',
             MonsterKind::Wisp => 'w',
+            MonsterKind::Hound => 'h',
+            MonsterKind::Beetle => 'b',
+            MonsterKind::Cinderling => 'c',
+            MonsterKind::Revenant => 'R',
         }
     }
 
@@ -168,6 +183,10 @@ impl MonsterKind {
             MonsterKind::Slime => Color::from_rgba(116, 232, 96, 255),
             MonsterKind::Brute => Color::from_rgba(210, 70, 70, 255),
             MonsterKind::Wisp => Color::from_rgba(112, 226, 255, 255),
+            MonsterKind::Hound => Color::from_rgba(242, 166, 96, 255),
+            MonsterKind::Beetle => Color::from_rgba(144, 198, 112, 255),
+            MonsterKind::Cinderling => Color::from_rgba(255, 136, 78, 255),
+            MonsterKind::Revenant => Color::from_rgba(188, 158, 255, 255),
         }
     }
 
@@ -177,6 +196,10 @@ impl MonsterKind {
             MonsterKind::Slime => "Slime",
             MonsterKind::Brute => "Brute",
             MonsterKind::Wisp => "Wisp",
+            MonsterKind::Hound => "Hound",
+            MonsterKind::Beetle => "Beetle",
+            MonsterKind::Cinderling => "Cinderling",
+            MonsterKind::Revenant => "Revenant",
         }
     }
 
@@ -186,6 +209,10 @@ impl MonsterKind {
             MonsterKind::Slime => 34.0,
             MonsterKind::Brute => 62.0,
             MonsterKind::Wisp => 22.0,
+            MonsterKind::Hound => 20.0,
+            MonsterKind::Beetle => 72.0,
+            MonsterKind::Cinderling => 18.0,
+            MonsterKind::Revenant => 58.0,
         }
     }
 
@@ -195,6 +222,10 @@ impl MonsterKind {
             MonsterKind::Slime => 62.0,
             MonsterKind::Brute => 52.0,
             MonsterKind::Wisp => 104.0,
+            MonsterKind::Hound => 122.0,
+            MonsterKind::Beetle => 42.0,
+            MonsterKind::Cinderling => 110.0,
+            MonsterKind::Revenant => 58.0,
         }
     }
 
@@ -204,6 +235,10 @@ impl MonsterKind {
             MonsterKind::Slime => 6.0,
             MonsterKind::Brute => 16.0,
             MonsterKind::Wisp => 10.0,
+            MonsterKind::Hound => 7.0,
+            MonsterKind::Beetle => 5.0,
+            MonsterKind::Cinderling => 15.0,
+            MonsterKind::Revenant => 18.0,
         }
     }
 
@@ -213,6 +248,10 @@ impl MonsterKind {
             MonsterKind::Slime => 1.15,
             MonsterKind::Brute => 1.35,
             MonsterKind::Wisp => 0.7,
+            MonsterKind::Hound => 0.78,
+            MonsterKind::Beetle => 1.45,
+            MonsterKind::Cinderling => 0.82,
+            MonsterKind::Revenant => 1.28,
         }
     }
 
@@ -222,6 +261,68 @@ impl MonsterKind {
             MonsterKind::Slime => 14,
             MonsterKind::Brute => 28,
             MonsterKind::Wisp => 18,
+            MonsterKind::Hound => 12,
+            MonsterKind::Beetle => 24,
+            MonsterKind::Cinderling => 20,
+            MonsterKind::Revenant => 30,
+        }
+    }
+}
+
+impl MonsterRank {
+    pub fn prefix(self) -> &'static str {
+        match self {
+            MonsterRank::Normal => "",
+            MonsterRank::Elite => "Elite ",
+            MonsterRank::Boss => "Boss ",
+        }
+    }
+
+    pub fn accent_color(self) -> Color {
+        match self {
+            MonsterRank::Normal => Color::from_rgba(255, 100, 100, 255),
+            MonsterRank::Elite => Color::from_rgba(255, 214, 108, 255),
+            MonsterRank::Boss => Color::from_rgba(255, 120, 208, 255),
+        }
+    }
+
+    fn hp_multiplier(self) -> f32 {
+        match self {
+            MonsterRank::Normal => 1.0,
+            MonsterRank::Elite => 1.8,
+            MonsterRank::Boss => 3.2,
+        }
+    }
+
+    fn damage_multiplier(self) -> f32 {
+        match self {
+            MonsterRank::Normal => 1.0,
+            MonsterRank::Elite => 1.35,
+            MonsterRank::Boss => 1.7,
+        }
+    }
+
+    fn xp_multiplier(self) -> f32 {
+        match self {
+            MonsterRank::Normal => 1.0,
+            MonsterRank::Elite => 1.6,
+            MonsterRank::Boss => 2.5,
+        }
+    }
+
+    pub fn gold_roll_bounds(self) -> (i32, i32) {
+        match self {
+            MonsterRank::Normal => (1, 7),
+            MonsterRank::Elite => (2, 10),
+            MonsterRank::Boss => (4, 14),
+        }
+    }
+
+    pub fn drop_chance(self) -> f64 {
+        match self {
+            MonsterRank::Normal => 0.54,
+            MonsterRank::Elite => 0.72,
+            MonsterRank::Boss => 1.0,
         }
     }
 }
@@ -326,16 +427,17 @@ pub fn scaled_monster_level(world_level: i32, player_level: i32) -> i32 {
     world_level.max((world_level + player_level) / 2)
 }
 
-pub fn monster_max_hp(kind: MonsterKind, level: i32) -> f32 {
-    kind.max_hp() * (1.0 + (level.max(1) - 1) as f32 * 0.35)
+pub fn monster_max_hp(kind: MonsterKind, level: i32, rank: MonsterRank) -> f32 {
+    kind.max_hp() * (1.0 + (level.max(1) - 1) as f32 * 0.35) * rank.hp_multiplier()
 }
 
-pub fn monster_damage(kind: MonsterKind, level: i32) -> f32 {
-    kind.damage() * (1.0 + (level.max(1) - 1) as f32 * 0.22)
+pub fn monster_damage(kind: MonsterKind, level: i32, rank: MonsterRank) -> f32 {
+    kind.damage() * (1.0 + (level.max(1) - 1) as f32 * 0.22) * rank.damage_multiplier()
 }
 
-pub fn monster_xp(kind: MonsterKind, level: i32) -> i32 {
-    (kind.base_xp() as f32 * (1.0 + (level.max(1) - 1) as f32 * 0.28)).round() as i32
+pub fn monster_xp(kind: MonsterKind, level: i32, rank: MonsterRank) -> i32 {
+    (kind.base_xp() as f32 * (1.0 + (level.max(1) - 1) as f32 * 0.28) * rank.xp_multiplier())
+        .round() as i32
 }
 
 pub fn roll_item(rng: &mut StdRng, item_level: i32) -> Item {
@@ -639,76 +741,108 @@ const CHARM_AFFIXES: [Affix; 6] = [
 
 const RARE_FIRST: [&str; 6] = ["Doom", "Storm", "Rune", "Grim", "Blood", "Gale"];
 const RARE_SECOND: [&str; 6] = ["Needle", "Shell", "Brand", "Ward", "Song", "Spur"];
-const MEADOW_ENCOUNTERS: [EncounterWeight; 4] = [
+const MEADOW_ENCOUNTERS: [EncounterWeight; 6] = [
     EncounterWeight {
         kind: MonsterKind::Imp,
-        weight: 42,
+        weight: 30,
     },
     EncounterWeight {
         kind: MonsterKind::Slime,
-        weight: 38,
+        weight: 24,
     },
     EncounterWeight {
-        kind: MonsterKind::Wisp,
-        weight: 15,
+        kind: MonsterKind::Hound,
+        weight: 22,
     },
     EncounterWeight {
-        kind: MonsterKind::Brute,
-        weight: 5,
-    },
-];
-const FUNGAL_GROVE_ENCOUNTERS: [EncounterWeight; 4] = [
-    EncounterWeight {
-        kind: MonsterKind::Imp,
+        kind: MonsterKind::Beetle,
         weight: 12,
     },
     EncounterWeight {
-        kind: MonsterKind::Slime,
-        weight: 48,
-    },
-    EncounterWeight {
         kind: MonsterKind::Wisp,
-        weight: 32,
+        weight: 8,
     },
     EncounterWeight {
         kind: MonsterKind::Brute,
-        weight: 8,
+        weight: 4,
     },
 ];
-const ASHFIELD_ENCOUNTERS: [EncounterWeight; 4] = [
-    EncounterWeight {
-        kind: MonsterKind::Imp,
-        weight: 34,
-    },
+const FUNGAL_GROVE_ENCOUNTERS: [EncounterWeight; 6] = [
     EncounterWeight {
         kind: MonsterKind::Slime,
-        weight: 10,
+        weight: 30,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Beetle,
+        weight: 24,
     },
     EncounterWeight {
         kind: MonsterKind::Wisp,
+        weight: 18,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Hound,
+        weight: 10,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Revenant,
+        weight: 10,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Cinderling,
+        weight: 8,
+    },
+];
+const ASHFIELD_ENCOUNTERS: [EncounterWeight; 6] = [
+    EncounterWeight {
+        kind: MonsterKind::Cinderling,
+        weight: 28,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Imp,
         weight: 24,
     },
     EncounterWeight {
         kind: MonsterKind::Brute,
-        weight: 32,
+        weight: 18,
     },
-];
-const OLD_RUINS_ENCOUNTERS: [EncounterWeight; 4] = [
     EncounterWeight {
-        kind: MonsterKind::Imp,
+        kind: MonsterKind::Hound,
         weight: 14,
     },
     EncounterWeight {
-        kind: MonsterKind::Slime,
-        weight: 8,
+        kind: MonsterKind::Wisp,
+        weight: 10,
     },
     EncounterWeight {
-        kind: MonsterKind::Wisp,
-        weight: 34,
+        kind: MonsterKind::Revenant,
+        weight: 6,
+    },
+];
+const OLD_RUINS_ENCOUNTERS: [EncounterWeight; 6] = [
+    EncounterWeight {
+        kind: MonsterKind::Revenant,
+        weight: 30,
     },
     EncounterWeight {
         kind: MonsterKind::Brute,
-        weight: 44,
+        weight: 24,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Wisp,
+        weight: 18,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Beetle,
+        weight: 12,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Cinderling,
+        weight: 10,
+    },
+    EncounterWeight {
+        kind: MonsterKind::Hound,
+        weight: 6,
     },
 ];
 
@@ -913,21 +1047,62 @@ mod tests {
 
     #[test]
     fn higher_level_monsters_are_tougher_and_worth_more_xp() {
-        assert!(monster_max_hp(MonsterKind::Brute, 5) > monster_max_hp(MonsterKind::Brute, 1));
-        assert!(monster_damage(MonsterKind::Brute, 5) > monster_damage(MonsterKind::Brute, 1));
-        assert!(monster_xp(MonsterKind::Brute, 5) > monster_xp(MonsterKind::Brute, 1));
+        assert!(
+            monster_max_hp(MonsterKind::Brute, 5, MonsterRank::Normal)
+                > monster_max_hp(MonsterKind::Brute, 1, MonsterRank::Normal)
+        );
+        assert!(
+            monster_damage(MonsterKind::Brute, 5, MonsterRank::Normal)
+                > monster_damage(MonsterKind::Brute, 1, MonsterRank::Normal)
+        );
+        assert!(
+            monster_xp(MonsterKind::Brute, 5, MonsterRank::Normal)
+                > monster_xp(MonsterKind::Brute, 1, MonsterRank::Normal)
+        );
+    }
+
+    #[test]
+    fn elite_and_boss_ranks_raise_combat_and_reward_values() {
+        assert!(
+            monster_max_hp(MonsterKind::Imp, 3, MonsterRank::Elite)
+                > monster_max_hp(MonsterKind::Imp, 3, MonsterRank::Normal)
+        );
+        assert!(
+            monster_damage(MonsterKind::Imp, 3, MonsterRank::Boss)
+                > monster_damage(MonsterKind::Imp, 3, MonsterRank::Elite)
+        );
+        assert!(
+            monster_xp(MonsterKind::Imp, 3, MonsterRank::Boss)
+                > monster_xp(MonsterKind::Imp, 3, MonsterRank::Elite)
+        );
+        assert!(
+            MonsterRank::Boss.drop_chance() > MonsterRank::Elite.drop_chance()
+                && MonsterRank::Elite.drop_chance() > MonsterRank::Normal.drop_chance()
+        );
+    }
+
+    #[test]
+    fn monster_roster_has_clear_stat_archetypes() {
+        assert!(MonsterKind::Hound.move_speed() > MonsterKind::Wisp.move_speed());
+        assert!(MonsterKind::Beetle.max_hp() > MonsterKind::Brute.max_hp());
+        assert!(MonsterKind::Cinderling.damage() > MonsterKind::Imp.damage());
+        assert!(MonsterKind::Revenant.damage() > MonsterKind::Brute.damage());
     }
 
     #[test]
     fn biome_encounter_tables_have_distinct_identities() {
         assert_eq!(encounter_table(Biome::Meadow)[0].kind, MonsterKind::Imp);
         assert_eq!(
-            encounter_table(Biome::FungalGrove)[1].kind,
+            encounter_table(Biome::FungalGrove)[0].kind,
             MonsterKind::Slime
         );
-        assert_eq!(encounter_table(Biome::Ashfield)[3].kind, MonsterKind::Brute);
-        assert!(
-            encounter_table(Biome::OldRuins)[3].weight > encounter_table(Biome::Meadow)[3].weight
+        assert_eq!(
+            encounter_table(Biome::Ashfield)[0].kind,
+            MonsterKind::Cinderling
+        );
+        assert_eq!(
+            encounter_table(Biome::OldRuins)[0].kind,
+            MonsterKind::Revenant
         );
     }
 

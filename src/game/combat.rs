@@ -463,8 +463,11 @@ impl Game {
             if index >= self.monsters.len() {
                 continue;
             }
-            let raw = monster_damage(self.monsters[index].kind, self.monsters[index].level)
-                + self.rng.random_range(-2.0..=3.0);
+            let raw = monster_damage(
+                self.monsters[index].kind,
+                self.monsters[index].level,
+                self.monsters[index].rank,
+            ) + self.rng.random_range(-2.0..=3.0);
             let damage = (raw - self.player.armor() as f32).max(1.0);
             if damage < raw {
                 self.award_discipline_xp(DisciplineKind::Armor, 2);
@@ -479,7 +482,7 @@ impl Game {
             self.screen_shake = self.screen_shake.max(8.0);
             self.log(format!(
                 "{} bites for {}.",
-                self.monsters[index].kind.name(),
+                self.monsters[index].display_name(),
                 damage.round() as i32
             ));
             if self.player.hp <= 0.0 {
@@ -525,7 +528,7 @@ impl Game {
             return;
         }
         let monster_pos = self.monsters[index].pos;
-        let monster_name = self.monsters[index].kind.name();
+        let monster_name = self.monsters[index].display_name();
         self.monsters[index].hp -= damage;
         self.monsters[index].hit_flash = 0.12;
         self.monsters[index].hit_offset =
@@ -562,9 +565,10 @@ impl Game {
     }
 
     pub(super) fn on_monster_killed(&mut self, monster: Monster) {
-        let xp = monster_xp(monster.kind, monster.level);
+        let xp = monster_xp(monster.kind, monster.level, monster.rank);
+        let (gold_min, gold_max) = monster.rank.gold_roll_bounds();
         self.player.stats.xp += xp;
-        self.player.stats.gold += self.rng.random_range(1..=7);
+        self.player.stats.gold += self.rng.random_range(gold_min..=gold_max);
         self.pulses.push(Pulse {
             pos: monster.pos,
             radius: 10.0,
@@ -578,10 +582,10 @@ impl Game {
             ttl: 1.05,
         });
         self.spawn_particles(monster.pos, 18, monster.kind.color());
-        self.log(format!("{} pops. +{} xp.", monster.kind.name(), xp));
-        if self.rng.random_bool(0.54) {
+        self.log(format!("{} pops. +{} xp.", monster.display_name(), xp));
+        if self.rng.random_bool(monster.rank.drop_chance()) {
             let item = roll_item(&mut self.rng, monster.level);
-            self.log(format!("{} drops {}.", monster.kind.name(), item.name));
+            self.log(format!("{} drops {}.", monster.display_name(), item.name));
             self.loot.push(Loot {
                 pos: monster.pos,
                 item,

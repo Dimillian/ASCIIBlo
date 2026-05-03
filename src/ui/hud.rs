@@ -370,7 +370,7 @@ fn draw_hovered_monster_tooltip(game: &Game) {
     let h = 62.0;
     let x = (screen_width() - w) * 0.5;
     let y = 90.0;
-    let color = monster.kind.color();
+    let color = monster.rank.accent_color();
     draw_rectangle(
         x,
         y,
@@ -379,7 +379,7 @@ fn draw_hovered_monster_tooltip(game: &Game) {
         with_alpha(Color::from_rgba(12, 14, 18, 255), 0.9),
     );
     draw_rectangle(x, y, 4.0, h, with_alpha(color, 0.92));
-    draw_text(monster.kind.name(), x + 16.0, y + 23.0, 20.0, color);
+    draw_text(&monster.display_name(), x + 16.0, y + 23.0, 20.0, color);
     draw_text(
         &format!("Lv {}", monster.level),
         x + w - 66.0,
@@ -407,7 +407,7 @@ fn draw_hovered_monster_tooltip(game: &Game) {
     draw_text(
         &format!(
             "ATK {}",
-            crate::content::monster_damage(monster.kind, monster.level).round()
+            crate::content::monster_damage(monster.kind, monster.level, monster.rank).round()
         ),
         x + w - 74.0,
         y + 47.0,

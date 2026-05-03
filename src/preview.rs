@@ -134,6 +134,9 @@ impl PreviewMode {
                 game.monsters.clear();
                 game.monsters.push(Monster {
                     kind: crate::content::MonsterKind::Brute,
+                    rank: crate::content::MonsterRank::Elite,
+                    pack_id: 0,
+                    pack_center: game.player.pos + Vec2::new(42.0, 0.0),
                     pos: game.player.pos + Vec2::new(42.0, 0.0),
                     vel: Vec2::ZERO,
                     hit_offset: Vec2::ZERO,

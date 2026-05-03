@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 
-use crate::content::{Item, MonsterKind, NpcKind};
+use crate::content::{Item, MonsterKind, MonsterRank, NpcKind};
 
 pub struct Stats {
     pub level: i32,
@@ -326,6 +326,9 @@ impl Player {
 
 pub struct Monster {
     pub kind: MonsterKind,
+    pub rank: MonsterRank,
+    pub pack_id: u64,
+    pub pack_center: Vec2,
     pub pos: Vec2,
     pub vel: Vec2,
     pub hit_offset: Vec2,
@@ -336,6 +339,12 @@ pub struct Monster {
     pub wobble: f32,
     pub hit_flash: f32,
     pub chill_ttl: f32,
+}
+
+impl Monster {
+    pub fn display_name(&self) -> String {
+        format!("{}{}", self.rank.prefix(), self.kind.name())
+    }
 }
 
 pub struct Loot {

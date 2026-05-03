@@ -297,6 +297,23 @@ impl Renderer {
         } else {
             base_color
         };
+        if monster.rank != crate::content::MonsterRank::Normal {
+            draw_circle_lines(
+                screen.x,
+                screen.y,
+                if monster.rank == crate::content::MonsterRank::Boss {
+                    21.0
+                } else {
+                    18.0
+                },
+                if monster.rank == crate::content::MonsterRank::Boss {
+                    2.0
+                } else {
+                    1.5
+                },
+                with_alpha(monster.rank.accent_color(), 0.92),
+            );
+        }
         draw_circle(screen.x, screen.y + 6.0, 10.0, with_alpha(BLACK, 0.28));
         draw_circle(screen.x, screen.y, 13.0, with_alpha(color, 0.16));
         match monster.kind {
@@ -356,6 +373,39 @@ impl Renderer {
                     with_alpha(color, 0.28),
                 );
             }
+            crate::content::MonsterKind::Hound => {
+                draw_line(
+                    screen.x - 10.0,
+                    screen.y + 5.0,
+                    screen.x + 10.0,
+                    screen.y + 5.0,
+                    2.0,
+                    with_alpha(color, 0.7),
+                );
+            }
+            crate::content::MonsterKind::Beetle => {
+                draw_circle_lines(screen.x, screen.y, 15.0, 2.0, with_alpha(color, 0.54));
+            }
+            crate::content::MonsterKind::Cinderling => {
+                draw_line(
+                    screen.x,
+                    screen.y - 16.0,
+                    screen.x,
+                    screen.y - 8.0,
+                    2.0,
+                    with_alpha(color, 0.82),
+                );
+            }
+            crate::content::MonsterKind::Revenant => {
+                draw_line(
+                    screen.x - 9.0,
+                    screen.y - 11.0,
+                    screen.x + 9.0,
+                    screen.y - 11.0,
+                    2.0,
+                    with_alpha(color, 0.72),
+                );
+            }
         }
         draw_text_centered(&monster.kind.glyph().to_string(), screen, 26.0, color);
         let width = 26.0;
@@ -371,7 +421,7 @@ impl Renderer {
             screen.y - 23.0,
             width * (monster.hp / monster.max_hp).clamp(0.0, 1.0),
             3.0,
-            Color::from_rgba(255, 100, 100, 255),
+            monster.rank.accent_color(),
         );
         draw_text(
             &format!("{}", monster.level),

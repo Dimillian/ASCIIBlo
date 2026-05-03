@@ -1,9 +1,14 @@
 use super::*;
-use crate::content::{MonsterKind, monster_xp, roll_item};
+use std::collections::{HashMap, HashSet};
+
+use crate::content::{MonsterKind, MonsterRank, monster_xp, roll_item};
 
 fn test_monster(kind: MonsterKind, pos: Vec2) -> Monster {
     Monster {
         kind,
+        rank: MonsterRank::Normal,
+        pack_id: 0,
+        pack_center: pos,
         pos,
         vel: Vec2::ZERO,
         hit_offset: Vec2::ZERO,
@@ -20,9 +25,13 @@ fn test_monster(kind: MonsterKind, pos: Vec2) -> Monster {
 #[test]
 fn leveling_grants_only_stat_points() {
     let mut game = Game::new(1);
-    game.player.stats.xp = game.player.stats.next_xp - monster_xp(MonsterKind::Imp, 1);
+    game.player.stats.xp =
+        game.player.stats.next_xp - monster_xp(MonsterKind::Imp, 1, MonsterRank::Normal);
     game.on_monster_killed(Monster {
         kind: MonsterKind::Imp,
+        rank: MonsterRank::Normal,
+        pack_id: 0,
+        pack_center: game.player.pos + vec2(40.0, 0.0),
         pos: game.player.pos + vec2(40.0, 0.0),
         vel: Vec2::ZERO,
         hit_offset: Vec2::ZERO,
@@ -64,23 +73,123 @@ fn walking_far_from_town_repopulates_monsters_around_the_player() {
 
     game.fixed_update(FIXED_DT);
 
-    assert_eq!(
-        game.monsters
-            .iter()
-            .filter(|monster| monster.pos.distance(game.player.pos) <= MONSTER_LOCAL_RADIUS)
-            .count(),
-        48
-    );
+    let nearby_packs: HashSet<u64> = game
+        .monsters
+        .iter()
+        .filter(|monster| monster.pack_center.distance(game.player.pos) <= MONSTER_LOCAL_RADIUS)
+        .map(|monster| monster.pack_id)
+        .collect();
+    assert_eq!(nearby_packs.len(), MONSTER_LOCAL_PACK_TARGET);
     assert!(
         game.monsters
             .iter()
-            .all(|monster| monster.pos.distance(game.player.pos) <= MONSTER_DESPAWN_RADIUS)
+            .all(|monster| monster.pack_center.distance(game.player.pos) <= MONSTER_DESPAWN_RADIUS)
     );
     assert!(
         game.monsters
             .iter()
             .all(|monster| monster.level >= game.world.biome_level(game.player.pos) - 2)
     );
+}
+
+#[test]
+fn spawned_monster_packs_are_homogeneous_and_clustered() {
+    let mut game = Game::new(2);
+    game.monsters.clear();
+    game.next_monster_pack_id = 0;
+    game.player.pos = World::tile_center(ivec2(220, 0));
+    game.spawn_monster_packs(MONSTER_LOCAL_PACK_TARGET);
+
+    let mut packs: HashMap<u64, Vec<&Monster>> = HashMap::new();
+    for monster in &game.monsters {
+        packs.entry(monster.pack_id).or_default().push(monster);
+    }
+
+    assert_eq!(packs.len(), MONSTER_LOCAL_PACK_TARGET);
+    for pack in packs.values() {
+        assert!((2..=7).contains(&pack.len()));
+        assert!(pack.iter().all(|monster| monster.kind == pack[0].kind));
+        assert!(
+            pack.iter()
+                .all(|monster| monster.pack_center == pack[0].pack_center)
+        );
+        assert!(pack.iter().all(|monster| {
+            let distance = monster.pos.distance(monster.pack_center);
+            (MONSTER_PACK_MEMBER_MIN_DISTANCE..=MONSTER_PACK_MEMBER_MAX_DISTANCE)
+                .contains(&distance)
+        }));
+        assert!(
+            pack.iter()
+                .filter(|monster| monster.rank != MonsterRank::Normal)
+                .count()
+                <= 1
+        );
+    }
+}
+
+#[test]
+fn spawned_pack_centers_keep_breathing_room() {
+    let mut game = Game::new(3);
+    game.monsters.clear();
+    game.next_monster_pack_id = 0;
+    game.player.pos = World::tile_center(ivec2(220, 0));
+    game.spawn_monster_packs(MONSTER_LOCAL_PACK_TARGET);
+
+    let mut centers_by_pack = HashMap::new();
+    for monster in &game.monsters {
+        centers_by_pack
+            .entry(monster.pack_id)
+            .or_insert(monster.pack_center);
+    }
+    let centers: Vec<Vec2> = centers_by_pack.into_values().collect();
+
+    for (index, center) in centers.iter().enumerate() {
+        for other in centers.iter().skip(index + 1) {
+            assert!(center.distance(*other) >= MONSTER_PACK_SEPARATION);
+        }
+    }
+}
+
+#[test]
+fn boss_pack_rolls_take_priority_over_elites() {
+    assert_eq!(
+        super::spawning::monster_pack_rank_for_roll(0),
+        MonsterRank::Boss
+    );
+    assert_eq!(
+        super::spawning::monster_pack_rank_for_roll(1),
+        MonsterRank::Boss
+    );
+    assert_eq!(
+        super::spawning::monster_pack_rank_for_roll(2),
+        MonsterRank::Elite
+    );
+    assert_eq!(
+        super::spawning::monster_pack_rank_for_roll(12),
+        MonsterRank::Normal
+    );
+}
+
+#[test]
+fn pack_spawn_visibility_accounts_for_the_full_cluster() {
+    let player = vec2(0.0, 0.0);
+    let half_view = vec2(640.0, 380.0);
+
+    assert!(super::spawning::pack_center_can_be_seen_with_view(
+        vec2(700.0, 0.0),
+        player,
+        half_view
+    ));
+    assert!(!super::spawning::pack_center_can_be_seen_with_view(
+        vec2(740.0, 0.0),
+        player,
+        half_view
+    ));
+    assert!(!super::spawning::pack_center_can_be_seen_with_view(
+        vec2(0.0, 500.0),
+        player,
+        half_view
+    ));
 }
 
 #[test]
@@ -114,6 +223,9 @@ fn hovered_monster_prefers_the_enemy_under_the_cursor() {
     game.monsters = vec![
         Monster {
             kind: MonsterKind::Imp,
+            rank: MonsterRank::Normal,
+            pack_id: 0,
+            pack_center: game.player.pos + vec2(20.0, 0.0),
             pos: game.player.pos + vec2(20.0, 0.0),
             vel: Vec2::ZERO,
             hit_offset: Vec2::ZERO,
@@ -127,6 +239,9 @@ fn hovered_monster_prefers_the_enemy_under_the_cursor() {
         },
         Monster {
             kind: MonsterKind::Brute,
+            rank: MonsterRank::Normal,
+            pack_id: 1,
+            pack_center: game.player.pos + vec2(24.0, 0.0),
             pos: game.player.pos + vec2(24.0, 0.0),
             vel: Vec2::ZERO,
             hit_offset: Vec2::ZERO,
@@ -197,9 +312,13 @@ fn gameplay_smoke_flow_reaches_combat_loot_shop_and_travel() {
     let mut game = Game::new(1);
     game.monsters.clear();
     game.player.facing = Vec2::X;
-    game.player.stats.xp = game.player.stats.next_xp - monster_xp(MonsterKind::Imp, 1);
+    game.player.stats.xp =
+        game.player.stats.next_xp - monster_xp(MonsterKind::Imp, 1, MonsterRank::Normal);
     game.monsters.push(Monster {
         kind: MonsterKind::Imp,
+        rank: MonsterRank::Normal,
+        pack_id: 0,
+        pack_center: game.player.pos + vec2(32.0, 0.0),
         pos: game.player.pos + vec2(32.0, 0.0),
         vel: Vec2::ZERO,
         hit_offset: Vec2::ZERO,
@@ -265,6 +384,9 @@ fn fireball_explodes_and_hits_nearby_monsters() {
     game.monsters = vec![
         Monster {
             kind: MonsterKind::Imp,
+            rank: MonsterRank::Normal,
+            pack_id: 0,
+            pack_center: game.player.pos + vec2(34.0, 0.0),
             pos: game.player.pos + vec2(34.0, 0.0),
             vel: Vec2::ZERO,
             hit_offset: Vec2::ZERO,
@@ -278,6 +400,9 @@ fn fireball_explodes_and_hits_nearby_monsters() {
         },
         Monster {
             kind: MonsterKind::Slime,
+            rank: MonsterRank::Normal,
+            pack_id: 1,
+            pack_center: game.player.pos + vec2(48.0, 10.0),
             pos: game.player.pos + vec2(48.0, 10.0),
             vel: Vec2::ZERO,
             hit_offset: Vec2::ZERO,
@@ -291,6 +416,9 @@ fn fireball_explodes_and_hits_nearby_monsters() {
         },
         Monster {
             kind: MonsterKind::Brute,
+            rank: MonsterRank::Normal,
+            pack_id: 2,
+            pack_center: game.player.pos + vec2(120.0, 0.0),
             pos: game.player.pos + vec2(120.0, 0.0),
             vel: Vec2::ZERO,
             hit_offset: Vec2::ZERO,
@@ -335,6 +463,9 @@ fn hitting_monster_sets_flash_and_recoil() {
     game.player.facing = Vec2::X;
     game.monsters = vec![Monster {
         kind: MonsterKind::Imp,
+        rank: MonsterRank::Normal,
+        pack_id: 0,
+        pack_center: game.player.pos + vec2(32.0, 0.0),
         pos: game.player.pos + vec2(32.0, 0.0),
         vel: Vec2::ZERO,
         hit_offset: Vec2::ZERO,
@@ -360,6 +491,9 @@ fn cleave_hits_front_arc_without_hitting_behind() {
     game.monsters = vec![
         Monster {
             kind: MonsterKind::Imp,
+            rank: MonsterRank::Normal,
+            pack_id: 0,
+            pack_center: game.player.pos + vec2(36.0, 0.0),
             pos: game.player.pos + vec2(36.0, 0.0),
             vel: Vec2::ZERO,
             hit_offset: Vec2::ZERO,
@@ -373,6 +507,9 @@ fn cleave_hits_front_arc_without_hitting_behind() {
         },
         Monster {
             kind: MonsterKind::Slime,
+            rank: MonsterRank::Normal,
+            pack_id: 1,
+            pack_center: game.player.pos + vec2(-36.0, 0.0),
             pos: game.player.pos + vec2(-36.0, 0.0),
             vel: Vec2::ZERO,
             hit_offset: Vec2::ZERO,
@@ -596,6 +733,9 @@ fn armor_mastery_gains_xp_when_damage_is_mitigated() {
     let mut game = Game::new(14);
     game.monsters = vec![Monster {
         kind: MonsterKind::Imp,
+        rank: MonsterRank::Normal,
+        pack_id: 0,
+        pack_center: game.player.pos + vec2(12.0, 0.0),
         pos: game.player.pos + vec2(12.0, 0.0),
         vel: Vec2::ZERO,
         hit_offset: Vec2::ZERO,

@@ -25,9 +25,15 @@ const PLAYER_RADIUS: f32 = 9.0;
 const MONSTER_RADIUS: f32 = 9.0;
 const PASSIVE_AGGRO_RADIUS: f32 = 176.0;
 const MONSTER_SPAWN_MIN_RADIUS: f32 = TILE * 11.0;
-const MONSTER_SPAWN_MAX_RADIUS_TILES: i32 = 22;
-const MONSTER_LOCAL_RADIUS: f32 = TILE * 32.0;
-const MONSTER_DESPAWN_RADIUS: f32 = TILE * 42.0;
+const MONSTER_SPAWN_MAX_RADIUS_TILES: i32 = 36;
+const MONSTER_LOCAL_RADIUS: f32 = TILE * 40.0;
+const MONSTER_DESPAWN_RADIUS: f32 = TILE * 50.0;
+const MONSTER_LOCAL_PACK_REFILL_THRESHOLD: usize = 6;
+const MONSTER_LOCAL_PACK_TARGET: usize = 8;
+const MONSTER_PACK_MEMBER_MIN_DISTANCE: f32 = TILE * 1.5;
+const MONSTER_PACK_MEMBER_MAX_DISTANCE: f32 = TILE * 3.0;
+const MONSTER_PACK_SEPARATION: f32 = TILE * 7.0;
+const DEFAULT_SPAWN_VISIBILITY_HALF_VIEW: Vec2 = Vec2::new(640.0, 380.0);
 const EXPLORATION_RADIUS: i32 = 14;
 const MAX_LOG_ENTRIES: usize = 32;
 
@@ -64,6 +70,8 @@ pub struct Game {
     pub agility_distance_bank: f32,
     pub preview_hover_world: Option<Vec2>,
     pub preview_hover_screen: Option<Vec2>,
+    spawn_visibility_half_view: Vec2,
+    next_monster_pack_id: u64,
     rng: StdRng,
     input: InputState,
     quit: bool,
@@ -169,12 +177,14 @@ impl Game {
             agility_distance_bank: 0.0,
             preview_hover_world: None,
             preview_hover_screen: None,
+            spawn_visibility_half_view: DEFAULT_SPAWN_VISIBILITY_HALF_VIEW,
+            next_monster_pack_id: 0,
             rng: StdRng::seed_from_u64(seed),
             input: InputState::default(),
             quit: false,
         };
         game.reveal_around_tile(World::world_to_tile(game.player.pos), EXPLORATION_RADIUS);
-        game.spawn_monsters(52);
+        game.spawn_monster_packs(MONSTER_LOCAL_PACK_TARGET);
         game
     }
 
@@ -293,6 +303,10 @@ impl Game {
         self.cull_distant_monsters();
         self.replenish_local_monsters();
         self.clear_edge_inputs();
+    }
+
+    pub fn set_spawn_visibility_viewport(&mut self, size: Vec2) {
+        self.spawn_visibility_half_view = size * 0.5;
     }
 
     pub fn frame_update(&mut self, dt: f32) {
