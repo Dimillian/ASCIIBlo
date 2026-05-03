@@ -47,9 +47,9 @@ The current slice includes:
 
 - Native windowed rendering with a smooth camera and layered UI
 - Real-time cooldown-based movement and combat with bindable skills, visible cooldown states, and mana-driven spellcasting
-- An infinite deterministic overworld with larger irregular biome provinces, new wilderness regions, generated settlements, roads, landmarks, and scattered props
+- An infinite seed-driven overworld with larger irregular biome provinces, new wilderness regions, generated settlements, roads, landmarks, and scattered props
 - Visible biome levels, a framed minimap, a discovered-world map, and waypoint travel unlocked through discovered towns
-- Procedural bounty-board quests with kill, bounty, contact, and recovery objectives plus directional guidance
+- Procedural town bounty boards with one active quest at a time, kill/bounty/contact/recovery objectives, guaranteed quest-owned targets, turn-ins, rewards, and directional guidance
 - Monsters with different tempos, attacks, level scaling, biome-specific encounter tables, clustered packs, elite and boss ranks, and hover target readouts
 - Loot, item inspection, rarity, gear bonuses, inventory, stats, XP, levels, spendable stat points, use-based mastery, unlockable abilities, gold
 - Villages and towns with visible floorplans, safe interiors, and tiered NPC services
