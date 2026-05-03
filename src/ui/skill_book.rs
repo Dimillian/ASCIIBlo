@@ -7,13 +7,12 @@ use crate::{
 };
 
 use super::widgets::{
-    draw_hotkey_badge, draw_hotkey_hint, draw_modal_backdrop, draw_modal_frame, draw_section_box,
-    wrap_text,
+    CHROME_GOLD, draw_focus_border, draw_hotkey_badge, draw_hotkey_hint, draw_interior_card,
+    draw_modal_backdrop, draw_modal_frame, draw_section_box, wrap_text,
 };
 
 const GOLD: Color = Color::new(255.0 / 255.0, 224.0 / 255.0, 96.0 / 255.0, 1.0);
 const MUTED: Color = Color::new(180.0 / 255.0, 184.0 / 255.0, 190.0 / 255.0, 1.0);
-const PANEL_FILL: Color = Color::new(10.0 / 255.0, 12.0 / 255.0, 16.0 / 255.0, 1.0);
 
 pub(crate) fn draw(game: &Game) {
     let w = 980.0;
@@ -73,12 +72,12 @@ pub(crate) fn draw(game: &Game) {
 fn draw_panel(rect: Rect, title: &str, focused: bool) {
     draw_section_box(rect, title);
     if focused {
-        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, with_alpha(GOLD, 0.82));
+        draw_focus_border(rect, GOLD);
     }
 }
 
 fn draw_loadout_strip(game: &Game, rect: Rect) {
-    draw_rectangle(rect.x, rect.y, rect.w, rect.h, with_alpha(PANEL_FILL, 0.82));
+    draw_interior_card(rect, CHROME_GOLD, false);
     draw_text("Loadout", rect.x + 16.0, rect.y + 24.0, 18.0, GOLD);
     draw_text(
         "Current battle loadout",
@@ -96,21 +95,7 @@ fn draw_loadout_strip(game: &Game, rect: Rect) {
             slot_w,
             42.0,
         );
-        draw_rectangle(
-            slot.x,
-            slot.y,
-            slot.w,
-            slot.h,
-            with_alpha(ability.color(), 0.10),
-        );
-        draw_rectangle_lines(
-            slot.x,
-            slot.y,
-            slot.w,
-            slot.h,
-            1.0,
-            with_alpha(ability.color(), 0.7),
-        );
+        draw_interior_card(slot, ability.color(), false);
         draw_hotkey_badge(&(index + 1).to_string(), vec2(slot.x + 10.0, slot.y + 9.0));
         draw_text(
             ability.glyph(),

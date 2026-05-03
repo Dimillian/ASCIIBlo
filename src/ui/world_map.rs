@@ -2,7 +2,9 @@ use macroquad::prelude::*;
 
 use crate::{game::Game, render::with_alpha, world::World};
 
-use super::widgets::{draw_hotkey_hint, draw_modal_backdrop, draw_modal_frame};
+use super::widgets::{
+    CHROME_GOLD, draw_hotkey_hint, draw_interior_card, draw_modal_backdrop, draw_modal_frame,
+};
 
 pub(crate) fn draw(game: &Game) {
     let frame = Rect::new(24.0, 24.0, screen_width() - 48.0, screen_height() - 48.0);
@@ -40,21 +42,7 @@ pub(crate) fn draw(game: &Game) {
 }
 
 fn draw_map_panel(game: &Game, rect: Rect) {
-    draw_rectangle(
-        rect.x,
-        rect.y,
-        rect.w,
-        rect.h,
-        with_alpha(Color::from_rgba(8, 10, 14, 255), 0.96),
-    );
-    draw_rectangle_lines(
-        rect.x,
-        rect.y,
-        rect.w,
-        rect.h,
-        2.0,
-        with_alpha(Color::from_rgba(255, 224, 96, 255), 0.72),
-    );
+    draw_interior_card(rect, CHROME_GOLD, false);
 
     let zoom = game.ui.world_map.zoom;
     let center = game.ui.world_map.center_tile;

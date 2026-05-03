@@ -8,6 +8,13 @@ use crate::{
 };
 
 pub(crate) const ITEM_SELECTION: Color = Color::new(128.0 / 255.0, 214.0 / 255.0, 1.0, 1.0);
+pub(crate) const CHROME_GOLD: Color = Color::new(255.0 / 255.0, 224.0 / 255.0, 96.0 / 255.0, 1.0);
+pub(crate) const CHROME_CYAN: Color = Color::new(128.0 / 255.0, 214.0 / 255.0, 1.0, 1.0);
+
+const MODAL_FILL: Color = Color::new(18.0 / 255.0, 20.0 / 255.0, 26.0 / 255.0, 1.0);
+const PANEL_FILL: Color = Color::new(10.0 / 255.0, 12.0 / 255.0, 16.0 / 255.0, 1.0);
+const CARD_FILL: Color = Color::new(12.0 / 255.0, 14.0 / 255.0, 19.0 / 255.0, 1.0);
+pub(crate) const CHROME_DIM: Color = Color::new(112.0 / 255.0, 104.0 / 255.0, 70.0 / 255.0, 1.0);
 
 pub(crate) fn draw_modal_backdrop() {
     draw_rectangle(
@@ -20,21 +27,36 @@ pub(crate) fn draw_modal_backdrop() {
 }
 
 pub(crate) fn draw_modal_frame(rect: Rect, title: &str) {
-    draw_rectangle(
-        rect.x,
-        rect.y,
-        rect.w,
-        rect.h,
-        Color::from_rgba(18, 20, 26, 245),
+    draw_retro_surface(
+        rect,
+        with_alpha(MODAL_FILL, 0.96),
+        with_alpha(CHROME_GOLD, 0.72),
+        with_alpha(CHROME_DIM, 0.58),
     );
     draw_rectangle(rect.x, rect.y, rect.w, 48.0, with_alpha(BLACK, 0.22));
     draw_line(
-        rect.x,
+        rect.x + 12.0,
         rect.y + 48.0,
-        rect.x + rect.w,
+        rect.x + rect.w - 12.0,
         rect.y + 48.0,
         2.0,
         Color::from_rgba(255, 224, 96, 180),
+    );
+    draw_line(
+        rect.x + 12.0,
+        rect.y + 8.0,
+        rect.x + 88.0,
+        rect.y + 8.0,
+        1.0,
+        with_alpha(CHROME_CYAN, 0.34),
+    );
+    draw_line(
+        rect.x + rect.w - 88.0,
+        rect.y + 8.0,
+        rect.x + rect.w - 12.0,
+        rect.y + 8.0,
+        1.0,
+        with_alpha(CHROME_CYAN, 0.34),
     );
     draw_text(
         title,
@@ -46,14 +68,37 @@ pub(crate) fn draw_modal_frame(rect: Rect, title: &str) {
 }
 
 pub(crate) fn draw_section_box(rect: Rect, title: &str) {
-    draw_rectangle(
-        rect.x,
-        rect.y,
-        rect.w,
-        rect.h,
-        with_alpha(Color::from_rgba(10, 12, 16, 255), 0.72),
+    draw_retro_surface(
+        rect,
+        with_alpha(PANEL_FILL, 0.72),
+        with_alpha(CHROME_DIM, 0.72),
+        with_alpha(WHITE, 0.05),
     );
     draw_section_label(title, vec2(rect.x, rect.y - 10.0));
+}
+
+pub(crate) fn draw_interior_card(rect: Rect, accent: Color, focused: bool) {
+    draw_retro_surface(
+        rect,
+        with_alpha(CARD_FILL, 0.90),
+        with_alpha(accent, if focused { 0.72 } else { 0.42 }),
+        with_alpha(WHITE, 0.05),
+    );
+    if focused {
+        draw_focus_border(rect, accent);
+    }
+}
+
+pub(crate) fn draw_focus_border(rect: Rect, color: Color) {
+    draw_rectangle_lines(
+        rect.x + 0.5,
+        rect.y + 0.5,
+        rect.w - 1.0,
+        rect.h - 1.0,
+        2.0,
+        with_alpha(color, 0.94),
+    );
+    draw_corner_ticks(rect, with_alpha(color, 0.94), 10.0);
 }
 
 pub(crate) fn draw_label_inline(label: &str, value: &str, pos: Vec2, value_offset: f32) {
@@ -74,6 +119,95 @@ pub(crate) fn draw_section_label(label: &str, pos: Vec2) {
         pos.y,
         19.0,
         Color::from_rgba(255, 224, 96, 255),
+    );
+}
+
+fn draw_retro_surface(rect: Rect, fill: Color, outer: Color, inner: Color) {
+    draw_rectangle(rect.x, rect.y, rect.w, rect.h, fill);
+    draw_rectangle_lines(
+        rect.x + 0.5,
+        rect.y + 0.5,
+        rect.w - 1.0,
+        rect.h - 1.0,
+        1.0,
+        outer,
+    );
+    draw_rectangle_lines(
+        rect.x + 4.5,
+        rect.y + 4.5,
+        rect.w - 9.0,
+        rect.h - 9.0,
+        1.0,
+        inner,
+    );
+    draw_corner_ticks(rect, outer, 12.0);
+}
+
+fn draw_corner_ticks(rect: Rect, color: Color, len: f32) {
+    let inset = 8.0;
+    draw_line(
+        rect.x + inset,
+        rect.y + 0.5,
+        rect.x + inset + len,
+        rect.y + 0.5,
+        1.0,
+        color,
+    );
+    draw_line(
+        rect.x + 0.5,
+        rect.y + inset,
+        rect.x + 0.5,
+        rect.y + inset + len,
+        1.0,
+        color,
+    );
+    draw_line(
+        rect.x + rect.w - inset - len,
+        rect.y + 0.5,
+        rect.x + rect.w - inset,
+        rect.y + 0.5,
+        1.0,
+        color,
+    );
+    draw_line(
+        rect.x + rect.w - 0.5,
+        rect.y + inset,
+        rect.x + rect.w - 0.5,
+        rect.y + inset + len,
+        1.0,
+        color,
+    );
+    draw_line(
+        rect.x + inset,
+        rect.y + rect.h - 0.5,
+        rect.x + inset + len,
+        rect.y + rect.h - 0.5,
+        1.0,
+        color,
+    );
+    draw_line(
+        rect.x + 0.5,
+        rect.y + rect.h - inset - len,
+        rect.x + 0.5,
+        rect.y + rect.h - inset,
+        1.0,
+        color,
+    );
+    draw_line(
+        rect.x + rect.w - inset - len,
+        rect.y + rect.h - 0.5,
+        rect.x + rect.w - inset,
+        rect.y + rect.h - 0.5,
+        1.0,
+        color,
+    );
+    draw_line(
+        rect.x + rect.w - 0.5,
+        rect.y + rect.h - inset - len,
+        rect.x + rect.w - 0.5,
+        rect.y + rect.h - inset,
+        1.0,
+        color,
     );
 }
 

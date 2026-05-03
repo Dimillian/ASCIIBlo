@@ -3,10 +3,10 @@ use macroquad::prelude::*;
 use crate::{game::Game, render::with_alpha, stat_display::PublicStat};
 
 use super::widgets::{
-    draw_hotkey_hint, draw_modal_backdrop, draw_modal_frame, draw_section_box, wrap_text,
+    CHROME_GOLD, draw_hotkey_hint, draw_interior_card, draw_modal_backdrop, draw_modal_frame,
+    draw_section_box, wrap_text,
 };
 
-const PANEL: Color = Color::new(10.0 / 255.0, 12.0 / 255.0, 16.0 / 255.0, 0.72);
 const MUTED: Color = Color::new(180.0 / 255.0, 184.0 / 255.0, 190.0 / 255.0, 1.0);
 const GOLD: Color = Color::new(255.0 / 255.0, 224.0 / 255.0, 96.0 / 255.0, 1.0);
 
@@ -256,13 +256,7 @@ fn draw_progression_header(game: &Game, rect: Rect) {
 
 fn draw_detail_panel(rect: Rect, detail: &str) {
     let detail_rect = Rect::new(rect.x + 18.0, rect.y + 100.0, rect.w - 36.0, 84.0);
-    draw_rectangle(
-        detail_rect.x,
-        detail_rect.y,
-        detail_rect.w,
-        detail_rect.h,
-        PANEL,
-    );
+    draw_interior_card(detail_rect, CHROME_GOLD, false);
     for (index, line) in wrap_text(detail, detail_rect.w - 24.0, 17.0, 3)
         .iter()
         .enumerate()

@@ -1,7 +1,8 @@
 use macroquad::prelude::*;
 
 use super::widgets::{
-    ITEM_SELECTION, draw_item_detail, draw_modal_backdrop, draw_modal_frame, draw_section_box,
+    CHROME_DIM, ITEM_SELECTION, draw_interior_card, draw_item_detail, draw_modal_backdrop,
+    draw_modal_frame, draw_section_box,
 };
 use crate::{
     content::{Item, Slot},
@@ -12,7 +13,6 @@ use crate::{
 
 const CELL: f32 = 30.0;
 const CELL_GAP: f32 = 3.0;
-const PANEL: Color = Color::new(10.0 / 255.0, 12.0 / 255.0, 16.0 / 255.0, 0.72);
 const MUTED: Color = Color::new(180.0 / 255.0, 184.0 / 255.0, 190.0 / 255.0, 1.0);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -138,20 +138,16 @@ fn draw_equipment<'a>(game: &'a Game, rect: Rect, hover: Vec2) -> Option<&'a Ite
             hovered = *item;
         }
 
-        draw_rectangle(slot_rect.x, slot_rect.y, slot_rect.w, slot_rect.h, PANEL);
-        draw_rectangle_lines(
-            slot_rect.x + 0.5,
-            slot_rect.y + 0.5,
-            slot_rect.w - 1.0,
-            slot_rect.h - 1.0,
-            if is_selected || is_hovered { 2.0 } else { 1.0 },
+        draw_interior_card(
+            *slot_rect,
             if is_selected || is_hovered {
                 ITEM_SELECTION
             } else if let Some(item) = item {
-                with_alpha(item.rarity.color(), 0.72)
+                item.rarity.color()
             } else {
-                with_alpha(WHITE, 0.1)
+                CHROME_DIM
             },
+            is_selected || is_hovered,
         );
         draw_text(
             slot.label(),
