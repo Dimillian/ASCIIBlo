@@ -6,6 +6,11 @@ name = "ASCIIBlo"
 script = ""
 
 [[actions]]
-name = "Run"
+name = "Run debug"
 icon = "run"
 command = "cargo run"
+
+[[actions]]
+name = "Run release"
+icon = "run"
+command = "cargo run --release"
