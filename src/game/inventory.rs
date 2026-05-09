@@ -41,9 +41,9 @@ impl Game {
             .expect("fitting loot should insert");
     }
 
-    pub(super) fn equip_selected_item(&mut self) {
+    pub(super) fn equip_selected_item(&mut self) -> Option<usize> {
         if self.sim.player.inventory.is_empty() {
-            return;
+            return None;
         }
         let Some(entry) = self
             .sim
@@ -51,9 +51,10 @@ impl Game {
             .inventory
             .remove(self.ui.inventory_backpack_cursor)
         else {
-            return;
+            return None;
         };
         let item = entry.item.clone();
+        let slot_index = equipment_slot_index(item.slot);
         let slot = match item.slot {
             Slot::Weapon => &mut self.sim.player.equipment.weapon,
             Slot::Armor => &mut self.sim.player.equipment.armor,
@@ -66,7 +67,7 @@ impl Game {
                     self.sim.player.inventory.restore(entry);
                     *slot = Some(previous);
                     self.log("Pack is full. Cannot swap gear.".into());
-                    return;
+                    return None;
                 }
             }
         }
@@ -77,25 +78,28 @@ impl Game {
             .ui
             .inventory_backpack_cursor
             .min(self.sim.player.inventory.len().saturating_sub(1));
+        Some(slot_index)
     }
 
-    pub(super) fn unequip_selected_item(&mut self) {
+    pub(super) fn unequip_selected_item(&mut self) -> Option<usize> {
         let Some(item) = self.selected_equipment_item().cloned() else {
-            return;
+            return None;
         };
         if !self.sim.player.inventory.can_fit(&item) {
             self.log("Pack is full. Cannot unequip gear.".into());
-            return;
+            return None;
         }
         let slot = self.selected_equipment_slot_mut();
         let item = slot.take().expect("slot was checked above");
-        self.sim
+        let backpack_index = self
+            .sim
             .player
             .inventory
             .insert_first_fit(item.clone())
             .expect("fitting gear should insert");
         self.sim.player.hp = self.sim.player.hp.min(self.sim.player.max_hp());
         self.log(format!("Unequipped {}.", item.name));
+        Some(backpack_index)
     }
 
     pub(super) fn buy_selected_item(&mut self) {
@@ -175,5 +179,13 @@ impl Game {
             1 => self.sim.player.equipment.armor.as_ref(),
             _ => self.sim.player.equipment.charm.as_ref(),
         }
+    }
+}
+
+fn equipment_slot_index(slot: Slot) -> usize {
+    match slot {
+        Slot::Weapon => 0,
+        Slot::Armor => 1,
+        Slot::Charm => 2,
     }
 }

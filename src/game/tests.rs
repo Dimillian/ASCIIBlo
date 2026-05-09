@@ -710,7 +710,7 @@ fn combat_feed_scrolls_through_older_entries() {
 fn equipping_moves_item_into_matching_slot() {
     let mut game = Game::new(1);
     game.ui.inventory_backpack_cursor = 0;
-    game.equip_selected_item();
+    assert_eq!(game.equip_selected_item(), Some(0));
 
     assert!(game.sim.player.equipment.weapon.is_some());
     assert_eq!(game.sim.player.inventory.len(), 1);
@@ -754,7 +754,7 @@ fn equipping_swaps_previous_gear_back_into_the_backpack() {
     game.sim.player.equipment.weapon = Some(test_item("Old Dirk", Slot::Weapon));
     game.ui.inventory_backpack_cursor = 0;
 
-    game.equip_selected_item();
+    assert_eq!(game.equip_selected_item(), Some(0));
 
     assert_eq!(
         game.sim.player.equipment.weapon.as_ref().unwrap().name,
@@ -787,6 +787,62 @@ fn overflowing_pickups_and_buys_leave_the_pack_unchanged() {
         game.fx.log.last().map(String::as_str),
         Some("Pack is full.")
     );
+}
+
+#[test]
+fn inventory_actions_move_focus_to_the_result_and_suppress_stale_hover() {
+    let mut game = Game::new(42);
+    game.ui.mode = UiMode::Inventory;
+    game.runtime.preview_hover_screen = Some(vec2(64.0, 64.0));
+    game.runtime.input.inventory_equip_pressed = true;
+    game.fixed_update(FIXED_DT);
+
+    assert_eq!(game.ui.inventory_focus, InventoryFocus::Equipment);
+    assert_eq!(game.ui.inventory_equipment_cursor, 0);
+    assert_eq!(
+        game.ui.inventory_hover_suppressed_at,
+        Some(vec2(64.0, 64.0))
+    );
+
+    game.runtime.input.inventory_equip_pressed = true;
+    game.fixed_update(FIXED_DT);
+
+    assert_eq!(game.ui.inventory_focus, InventoryFocus::Backpack);
+    assert_eq!(game.ui.inventory_backpack_cursor, 0);
+    assert_eq!(
+        game.ui.inventory_hover_suppressed_at,
+        Some(vec2(64.0, 64.0))
+    );
+
+    game.runtime.preview_hover_screen = Some(vec2(70.0, 64.0));
+    game.fixed_update(FIXED_DT);
+    assert_eq!(game.ui.inventory_hover_suppressed_at, None);
+}
+
+#[test]
+fn opening_inventory_starts_unselected_and_suppresses_stationary_hover() {
+    let mut game = Game::new(42);
+    game.runtime.mouse_screen = vec2(320.0, 240.0);
+    game.runtime.input.inventory_toggle_pressed = true;
+    game.fixed_update(FIXED_DT);
+
+    assert_eq!(game.ui.mode, UiMode::Inventory);
+    assert!(!game.ui.inventory_selection_active);
+    assert_eq!(
+        game.ui.inventory_hover_suppressed_at,
+        Some(vec2(320.0, 240.0))
+    );
+
+    game.runtime.preview_hover_screen = Some(vec2(320.0, 240.0));
+    game.fixed_update(FIXED_DT);
+    assert_eq!(
+        game.ui.inventory_hover_suppressed_at,
+        Some(vec2(320.0, 240.0))
+    );
+
+    game.runtime.preview_hover_screen = Some(vec2(322.0, 240.0));
+    game.fixed_update(FIXED_DT);
+    assert_eq!(game.ui.inventory_hover_suppressed_at, None);
 }
 
 #[test]
@@ -835,7 +891,7 @@ fn unequipping_fails_when_the_pack_has_no_space_for_the_item() {
     game.ui.inventory_focus = InventoryFocus::Equipment;
     game.ui.inventory_equipment_cursor = 0;
 
-    game.unequip_selected_item();
+    assert_eq!(game.unequip_selected_item(), None);
 
     assert_eq!(
         game.sim.player.equipment.weapon.as_ref().unwrap().name,
@@ -912,7 +968,7 @@ fn gameplay_smoke_flow_reaches_combat_loot_shop_and_travel() {
     assert_eq!(game.sim.player.inventory.len(), inventory_before_loot + 1);
 
     game.ui.inventory_backpack_cursor = 0;
-    game.equip_selected_item();
+    let _ = game.equip_selected_item();
     assert!(game.sim.player.equipment.weapon.is_some());
 
     game.sim.player.pos = game
@@ -1579,8 +1635,10 @@ fn every_ui_window_supports_basic_navigation() {
     game.runtime.input.inventory_toggle_pressed = true;
     game.fixed_update(FIXED_DT);
     assert_eq!(game.ui.mode, UiMode::Inventory);
+    assert!(!game.ui.inventory_selection_active);
     game.runtime.input.inventory_down_pressed = true;
     game.fixed_update(FIXED_DT);
+    assert!(game.ui.inventory_selection_active);
     assert_eq!(game.ui.inventory_backpack_cursor, 1);
     game.runtime.input.nav_right_pressed = true;
     game.fixed_update(FIXED_DT);

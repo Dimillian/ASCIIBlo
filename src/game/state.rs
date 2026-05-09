@@ -32,6 +32,8 @@ pub struct UiState {
     pub inventory_focus: super::InventoryFocus,
     pub inventory_backpack_cursor: usize,
     pub inventory_equipment_cursor: usize,
+    pub inventory_selection_active: bool,
+    pub inventory_hover_suppressed_at: Option<Vec2>,
     pub character_cursor: usize,
     pub skill_book_cursor: usize,
     pub skill_book_ability_cursor: usize,
@@ -59,6 +61,7 @@ pub struct FxState {
 pub struct RuntimeState {
     pub elapsed: f32,
     pub(super) agility_distance_bank: f32,
+    pub mouse_screen: Vec2,
     pub preview_hover_world: Option<Vec2>,
     pub preview_hover_screen: Option<Vec2>,
     pub(super) spawn_visibility_half_view: Vec2,
@@ -74,6 +77,7 @@ impl RuntimeState {
         Self {
             elapsed: 0.0,
             agility_distance_bank: 0.0,
+            mouse_screen: Vec2::ZERO,
             preview_hover_world: None,
             preview_hover_screen: None,
             spawn_visibility_half_view: DEFAULT_SPAWN_VISIBILITY_HALF_VIEW,
@@ -112,6 +116,8 @@ impl UiState {
             inventory_focus: super::InventoryFocus::Backpack,
             inventory_backpack_cursor: 0,
             inventory_equipment_cursor: 0,
+            inventory_selection_active: false,
+            inventory_hover_suppressed_at: None,
             character_cursor: 0,
             skill_book_cursor: 0,
             skill_book_ability_cursor: 0,

@@ -9,57 +9,94 @@ use super::{EXPLORATION_RADIUS, Game, InventoryFocus, ShopTab, UiMode};
 
 impl Game {
     pub(super) fn update_inventory_controls(&mut self) {
+        if let Some(suppressed_at) = self.ui.inventory_hover_suppressed_at {
+            let hover = self.ui_hover_position();
+            if suppressed_at.distance(hover) > 1.0 {
+                self.ui.inventory_hover_suppressed_at = None;
+            }
+        }
         if self.runtime.input.attack_pressed {
-            match crate::ui::inventory_hit_test(self, self.ui_hover_position()) {
+            let hover = self.ui_hover_position();
+            match crate::ui::inventory_hit_test(self, hover) {
                 Some(crate::ui::inventory::InventoryHit::Backpack(index)) => {
+                    self.ui.inventory_selection_active = true;
                     self.ui.inventory_focus = InventoryFocus::Backpack;
                     self.ui.inventory_backpack_cursor = index;
-                    self.equip_selected_item();
+                    if let Some(slot_index) = self.equip_selected_item() {
+                        self.ui.inventory_focus = InventoryFocus::Equipment;
+                        self.ui.inventory_equipment_cursor = slot_index;
+                        self.ui.inventory_hover_suppressed_at = Some(hover);
+                    }
                     return;
                 }
                 Some(crate::ui::inventory::InventoryHit::Equipment(index)) => {
+                    self.ui.inventory_selection_active = true;
                     self.ui.inventory_focus = InventoryFocus::Equipment;
                     self.ui.inventory_equipment_cursor = index;
-                    self.unequip_selected_item();
+                    if let Some(backpack_index) = self.unequip_selected_item() {
+                        self.ui.inventory_focus = InventoryFocus::Backpack;
+                        self.ui.inventory_backpack_cursor = backpack_index;
+                        self.ui.inventory_hover_suppressed_at = Some(hover);
+                    }
                     return;
                 }
                 None => {}
             }
         }
         if self.runtime.input.nav_left_pressed {
+            self.ui.inventory_selection_active = true;
             self.ui.inventory_focus = InventoryFocus::Backpack;
         }
         if self.runtime.input.nav_right_pressed {
+            self.ui.inventory_selection_active = true;
             self.ui.inventory_focus = InventoryFocus::Equipment;
         }
         match self.ui.inventory_focus {
             InventoryFocus::Backpack => {
                 if self.runtime.input.inventory_up_pressed {
+                    self.ui.inventory_selection_active = true;
                     self.ui.inventory_backpack_cursor =
                         self.ui.inventory_backpack_cursor.saturating_sub(1);
                 }
                 if self.runtime.input.inventory_down_pressed
                     && !self.sim.player.inventory.is_empty()
                 {
+                    self.ui.inventory_selection_active = true;
                     self.ui.inventory_backpack_cursor = (self.ui.inventory_backpack_cursor + 1)
                         .min(self.sim.player.inventory.len() - 1);
                 }
             }
             InventoryFocus::Equipment => {
                 if self.runtime.input.inventory_up_pressed {
+                    self.ui.inventory_selection_active = true;
                     self.ui.inventory_equipment_cursor =
                         self.ui.inventory_equipment_cursor.saturating_sub(1);
                 }
                 if self.runtime.input.inventory_down_pressed {
+                    self.ui.inventory_selection_active = true;
                     self.ui.inventory_equipment_cursor =
                         (self.ui.inventory_equipment_cursor + 1).min(2);
                 }
             }
         }
         if self.runtime.input.inventory_equip_pressed {
+            self.ui.inventory_selection_active = true;
+            let hover = self.ui_hover_position();
             match self.ui.inventory_focus {
-                InventoryFocus::Backpack => self.equip_selected_item(),
-                InventoryFocus::Equipment => self.unequip_selected_item(),
+                InventoryFocus::Backpack => {
+                    if let Some(slot_index) = self.equip_selected_item() {
+                        self.ui.inventory_focus = InventoryFocus::Equipment;
+                        self.ui.inventory_equipment_cursor = slot_index;
+                        self.ui.inventory_hover_suppressed_at = Some(hover);
+                    }
+                }
+                InventoryFocus::Equipment => {
+                    if let Some(backpack_index) = self.unequip_selected_item() {
+                        self.ui.inventory_focus = InventoryFocus::Backpack;
+                        self.ui.inventory_backpack_cursor = backpack_index;
+                        self.ui.inventory_hover_suppressed_at = Some(hover);
+                    }
+                }
             }
         }
         if self.runtime.input.inventory_drop_pressed

@@ -28,6 +28,7 @@ pub(super) struct InputState {
 
 impl Game {
     pub fn collect_input(&mut self, aim_world: Vec2) {
+        self.runtime.mouse_screen = mouse_position().into();
         let mut movement = Vec2::ZERO;
         if is_key_down(KeyCode::W) {
             movement.y -= 1.0;

@@ -291,7 +291,6 @@ impl PreviewMode {
                     haste: 1,
                     value: 7,
                 });
-                game.ui.inventory_backpack_cursor = 2;
                 game.ui.mode = UiMode::Inventory;
             }
             PreviewMode::Character => {

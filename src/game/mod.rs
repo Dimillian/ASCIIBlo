@@ -129,6 +129,8 @@ impl Game {
             self.ui.mode = if self.ui.mode == UiMode::Inventory {
                 UiMode::None
             } else {
+                self.ui.inventory_selection_active = false;
+                self.ui.inventory_hover_suppressed_at = Some(self.runtime.mouse_screen);
                 UiMode::Inventory
             };
             self.ui.inventory_backpack_cursor = self
@@ -316,7 +318,7 @@ impl Game {
     pub fn ui_hover_position(&self) -> Vec2 {
         self.runtime
             .preview_hover_screen
-            .unwrap_or(mouse_position().into())
+            .unwrap_or(self.runtime.mouse_screen)
     }
 
     pub(crate) fn reveal_around_tile(&mut self, center: IVec2, radius: i32) {
