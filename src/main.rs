@@ -7,7 +7,7 @@ mod stat_display;
 mod ui;
 mod world;
 
-use game::{FIXED_DT, Game};
+use game::{FIXED_DT, Game, render_balance_report};
 use launch::LaunchOptions;
 use macroquad::prelude::*;
 use preview::{PreviewRequest, PreviewRunner, PreviewTick};
@@ -27,6 +27,10 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     let launch = LaunchOptions::from_env();
+    if launch.balance_report {
+        println!("{}", render_balance_report(launch.seed));
+        return;
+    }
     println!("World seed: {}", launch.seed);
     let mut game = Game::new(launch.seed);
     let preview_request = launch.preview_request;

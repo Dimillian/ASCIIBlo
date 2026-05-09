@@ -5,6 +5,7 @@ use crate::preview::PreviewRequest;
 const DEFAULT_PREVIEW_SEED: u64 = 0xA5C1_1B10;
 
 pub struct LaunchOptions {
+    pub balance_report: bool,
     pub preview_request: PreviewRequest,
     pub seed: u64,
 }
@@ -20,15 +21,17 @@ impl LaunchOptions {
         F: FnOnce() -> u64,
     {
         let args = args.collect::<Vec<_>>();
+        let balance_report = args.iter().any(|arg| arg == "--balance-report");
         let preview_request = PreviewRequest::from_args(args.clone().into_iter());
         let seed = explicit_seed(&args).unwrap_or_else(|| {
-            if preview_request.is_preview() {
+            if preview_request.is_preview() || balance_report {
                 DEFAULT_PREVIEW_SEED
             } else {
                 fresh_seed()
             }
         });
         Self {
+            balance_report,
             preview_request,
             seed,
         }
@@ -64,6 +67,7 @@ mod tests {
         let options =
             LaunchOptions::from_args_with_seed_source(std::iter::empty::<String>(), || 777);
         assert_eq!(options.seed, 777);
+        assert!(!options.balance_report);
         assert!(matches!(options.preview_request, PreviewRequest::None));
     }
 
@@ -76,6 +80,7 @@ mod tests {
             || 777,
         );
         assert_eq!(options.seed, DEFAULT_PREVIEW_SEED);
+        assert!(!options.balance_report);
         assert!(matches!(
             options.preview_request,
             PreviewRequest::Single {
@@ -107,5 +112,15 @@ mod tests {
             || 777,
         );
         assert_eq!(hex_preview.seed, DEFAULT_PREVIEW_SEED);
+    }
+
+    #[test]
+    fn balance_reports_use_the_stable_default_seed() {
+        let options = LaunchOptions::from_args_with_seed_source(
+            ["--balance-report"].into_iter().map(String::from),
+            || 777,
+        );
+        assert_eq!(options.seed, DEFAULT_PREVIEW_SEED);
+        assert!(options.balance_report);
     }
 }

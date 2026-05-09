@@ -1,5 +1,6 @@
 mod abilities;
 mod ability_defs;
+mod balance;
 mod combat;
 mod events;
 mod input;
@@ -19,6 +20,7 @@ use crate::{
     world::{SettlementTier, TILE, TOWN_RADIUS, World},
 };
 
+pub(crate) use balance::render_balance_report;
 use input::InputState;
 use progression::discipline_next_xp;
 use state::{FxState, RuntimeState, SimulationState, UiState};
