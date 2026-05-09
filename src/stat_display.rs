@@ -18,7 +18,6 @@ pub(crate) enum PublicStat {
     MeleeDamage,
     SpellDamage,
     ManaRegen,
-    StatPoints,
 }
 
 impl PublicStat {
@@ -37,7 +36,6 @@ impl PublicStat {
             PublicStat::MeleeDamage => "Melee damage",
             PublicStat::SpellDamage => "Spell damage",
             PublicStat::ManaRegen => "Mana regeneration",
-            PublicStat::StatPoints => "Stat points",
         }
     }
 
@@ -56,7 +54,6 @@ impl PublicStat {
             PublicStat::MeleeDamage => "Melee",
             PublicStat::SpellDamage => "Spell",
             PublicStat::ManaRegen => "Regen",
-            PublicStat::StatPoints => "Pts",
         }
     }
 
@@ -64,11 +61,14 @@ impl PublicStat {
         match self {
             PublicStat::Strength => player.stats.strength.to_string(),
             PublicStat::Agility => player.stats.agility.to_string(),
-            PublicStat::Vitality => format!(
-                "{} (+{} gear)",
-                player.stats.vitality,
-                player.equipment.bonus_vitality()
-            ),
+            PublicStat::Vitality => {
+                let gear_bonus = player.equipment.bonus_vitality();
+                if gear_bonus == 0 {
+                    player.stats.vitality.to_string()
+                } else {
+                    format!("{} (+{} gear)", player.stats.vitality, gear_bonus)
+                }
+            }
             PublicStat::Life => format!(
                 "{} / {}",
                 player.hp.round() as i32,
@@ -87,7 +87,6 @@ impl PublicStat {
             PublicStat::MeleeDamage => format!("+{}", player.melee_damage_bonus()),
             PublicStat::SpellDamage => format!("+{}", player.magic_damage_bonus()),
             PublicStat::ManaRegen => format!("+{:.1}/s", player.magic_regen_bonus()),
-            PublicStat::StatPoints => player.stats.unspent_stat_points.to_string(),
         }
     }
 
@@ -102,10 +101,18 @@ impl PublicStat {
                 "Agility increases Move speed, shortens Attack delay, and raises Crit chance. Current Agility sets Crit chance to {:.0}%.",
                 player.crit_chance() * 100.0
             ),
-            PublicStat::Vitality => format!(
-                "Vitality grants 7 maximum Life per point and 1 Armor every 2 base points. Gear adds {} Vitality.",
-                player.equipment.bonus_vitality()
-            ),
+            PublicStat::Vitality => {
+                let gear_bonus = player.equipment.bonus_vitality();
+                if gear_bonus == 0 {
+                    "Vitality grants 7 maximum Life per point and 1 Armor every 2 base points."
+                        .into()
+                } else {
+                    format!(
+                        "Vitality grants 7 maximum Life per point and 1 Armor every 2 base points. Gear adds {} Vitality.",
+                        gear_bonus
+                    )
+                }
+            }
             PublicStat::Life => {
                 "Life is lost when monsters hit you. If it reaches 0, you wake in town and lose some gold."
                     .into()
@@ -139,9 +146,6 @@ impl PublicStat {
             PublicStat::SpellDamage => "Extra damage added to Magic skills.".into(),
             PublicStat::ManaRegen => {
                 "Extra Mana restored each second from Magic mastery.".into()
-            }
-            PublicStat::StatPoints => {
-                "Spend Stat points on Strength, Agility, or Vitality with Enter.".into()
             }
         }
     }
@@ -364,5 +368,24 @@ mod tests {
         assert_eq!(PublicStat::MoveSpeed.label(), "Move speed");
         assert_eq!(PublicStat::MoveSpeed.compact_label(), "Speed");
         assert_eq!(PublicStat::MoveSpeed.value(&game.sim.player), "100");
+    }
+
+    #[test]
+    fn vitality_hides_empty_gear_bonus_but_keeps_real_bonus_visible() {
+        let mut game = Game::new(3);
+
+        assert_eq!(PublicStat::Vitality.value(&game.sim.player), "4");
+        assert_eq!(
+            PublicStat::Vitality.detail(&game.sim.player),
+            "Vitality grants 7 maximum Life per point and 1 Armor every 2 base points."
+        );
+
+        game.sim.player.equipment.charm = Some(haste_charm());
+
+        assert_eq!(PublicStat::Vitality.value(&game.sim.player), "4 (+1 gear)");
+        assert_eq!(
+            PublicStat::Vitality.detail(&game.sim.player),
+            "Vitality grants 7 maximum Life per point and 1 Armor every 2 base points. Gear adds 1 Vitality."
+        );
     }
 }

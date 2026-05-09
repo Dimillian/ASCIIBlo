@@ -25,14 +25,14 @@ pub(crate) fn draw(game: &Game) {
     draw_modal_backdrop();
     draw_modal_frame(Rect::new(x, y, w, h), "Character");
 
-    draw_overview(game, vec2(x + 24.0, y + 70.0));
+    draw_overview(game, Rect::new(x + 24.0, y + 64.0, w - 48.0, 34.0));
 
-    let left = Rect::new(x + 24.0, y + 108.0, 246.0, 344.0);
-    let middle = Rect::new(x + 290.0, y + 108.0, 246.0, 344.0);
-    let right = Rect::new(x + 556.0, y + 108.0, 380.0, 344.0);
+    let left = Rect::new(x + 24.0, y + 122.0, 246.0, 330.0);
+    let middle = Rect::new(x + 290.0, y + 122.0, 246.0, 330.0);
+    let right = Rect::new(x + 556.0, y + 122.0, 380.0, 330.0);
     draw_section_box(left, "Attributes");
     draw_section_box(middle, "Combat");
-    draw_section_box(right, "Details");
+    draw_section_box(right, "Inspector");
 
     let attribute_rows = vec![
         StatRow {
@@ -63,12 +63,6 @@ pub(crate) fn draw(game: &Game) {
             label: PublicStat::Mana.label(),
             value: PublicStat::Mana.value(&game.sim.player),
             detail: PublicStat::Mana.detail(&game.sim.player),
-            cursor_index: None,
-        },
-        StatRow {
-            label: "Gold",
-            value: game.sim.player.stats.gold.to_string(),
-            detail: "Gold buys merchant gear. Death costs 20% of the gold you are carrying.".into(),
             cursor_index: None,
         },
     ];
@@ -106,31 +100,14 @@ pub(crate) fn draw(game: &Game) {
         },
     ];
 
-    let progression_rows = vec![StatRow {
-        label: PublicStat::StatPoints.label(),
-        value: PublicStat::StatPoints.value(&game.sim.player),
-        detail: PublicStat::StatPoints.detail(&game.sim.player),
-        cursor_index: None,
-    }];
-
     let hover = game.ui_hover_position();
-    let mut focused = draw_rows(&attribute_rows, left, game.ui.character_cursor, hover);
-    focused = focused
-        .or_else(|| draw_rows(&combat_rows, middle, game.ui.character_cursor, hover))
-        .or_else(|| {
-            draw_rows(
-                &progression_rows,
-                Rect::new(right.x + 18.0, right.y + 194.0, right.w - 36.0, 52.0),
-                game.ui.character_cursor,
-                hover,
-            )
-        });
+    let hovered_attribute = draw_rows(&attribute_rows, left, game.ui.character_cursor, hover);
+    let hovered_combat = draw_rows(&combat_rows, middle, game.ui.character_cursor, hover);
+    let focused = hovered_attribute
+        .or(hovered_combat)
+        .unwrap_or_else(|| selected_row(&attribute_rows, game));
 
-    draw_progression_header(game, right);
-    draw_detail_panel(
-        right,
-        focused.unwrap_or_else(|| selected_detail(&attribute_rows, &progression_rows, game)),
-    );
+    draw_inspector(game, right, focused);
 
     let mut hint_x = x + 24.0;
     hint_x += draw_hotkey_hint("Up/Down", "select spendable", vec2(hint_x, y + h - 44.0)) + 12.0;
@@ -139,26 +116,59 @@ pub(crate) fn draw(game: &Game) {
     draw_hotkey_hint("Esc", "close", vec2(hint_x, y + h - 44.0));
 }
 
-fn draw_overview(game: &Game, pos: Vec2) {
+fn draw_overview(game: &Game, rect: Rect) {
+    let xp_ratio = game.sim.player.stats.xp as f32 / game.sim.player.stats.next_xp as f32;
+    draw_text(
+        &format!("Level {}", game.sim.player.stats.level),
+        rect.x,
+        rect.y + 22.0,
+        20.0,
+        WHITE,
+    );
+
+    let xp_rect = Rect::new(rect.x + 108.0, rect.y + 5.0, 324.0, 20.0);
+    draw_rectangle(
+        xp_rect.x,
+        xp_rect.y,
+        xp_rect.w,
+        xp_rect.h,
+        with_alpha(WHITE, 0.07),
+    );
+    draw_rectangle(
+        xp_rect.x,
+        xp_rect.y,
+        xp_rect.w * xp_ratio,
+        xp_rect.h,
+        with_alpha(GOLD, 0.72),
+    );
     draw_text(
         &format!(
-            "Level {}   XP {} / {}   Gold {}",
-            game.sim.player.stats.level,
-            game.sim.player.stats.xp,
-            game.sim.player.stats.next_xp,
-            game.sim.player.stats.gold
+            "{} / {} xp",
+            game.sim.player.stats.xp, game.sim.player.stats.next_xp
         ),
-        pos.x,
-        pos.y,
-        20.0,
+        xp_rect.x + 10.0,
+        xp_rect.y + 15.0,
+        15.0,
+        WHITE,
+    );
+
+    draw_text(
+        &format!("Gold {}", game.sim.player.stats.gold),
+        rect.x + 468.0,
+        rect.y + 22.0,
+        19.0,
         WHITE,
     );
     draw_text(
         &format!("Stat points {}", game.sim.player.stats.unspent_stat_points),
-        pos.x + 378.0,
-        pos.y,
-        18.0,
-        MUTED,
+        rect.x + rect.w - 160.0,
+        rect.y + 22.0,
+        19.0,
+        if game.sim.player.stats.unspent_stat_points > 0 {
+            GOLD
+        } else {
+            MUTED
+        },
     );
 }
 
@@ -167,7 +177,7 @@ fn draw_rows<'a>(
     rect: Rect,
     selected_cursor: usize,
     mouse: Vec2,
-) -> Option<&'a str> {
+) -> Option<&'a StatRow> {
     let mut hovered = None;
 
     for (index, row) in rows.iter().enumerate() {
@@ -180,7 +190,7 @@ fn draw_rows<'a>(
         let is_hovered = row_rect.contains(mouse);
         let is_selected = row.cursor_index == Some(selected_cursor);
         if is_hovered {
-            hovered = Some(row.detail.as_str());
+            hovered = Some(row);
         }
         if is_hovered || is_selected {
             draw_rectangle(
@@ -211,53 +221,27 @@ fn draw_rows<'a>(
     hovered
 }
 
-fn selected_detail<'a>(
-    attribute_rows: &'a [StatRow],
-    progression_rows: &'a [StatRow],
-    game: &Game,
-) -> &'a str {
+fn selected_row<'a>(attribute_rows: &'a [StatRow], game: &Game) -> &'a StatRow {
     attribute_rows
         .iter()
-        .chain(progression_rows.iter())
         .find(|row| row.cursor_index == Some(game.ui.character_cursor))
-        .map(|row| row.detail.as_str())
-        .unwrap_or("Hover a stat to inspect what it does.")
+        .unwrap_or(&attribute_rows[0])
 }
 
-fn draw_progression_header(game: &Game, rect: Rect) {
-    let top = rect.y + 18.0;
-    draw_text("Progression", rect.x + 18.0, top + 2.0, 18.0, GOLD);
-    draw_rectangle(
-        rect.x + 18.0,
-        top + 18.0,
-        rect.w - 36.0,
-        18.0,
-        with_alpha(WHITE, 0.07),
-    );
-    draw_rectangle(
-        rect.x + 18.0,
-        top + 18.0,
-        (rect.w - 36.0) * (game.sim.player.stats.xp as f32 / game.sim.player.stats.next_xp as f32),
-        18.0,
-        with_alpha(GOLD, 0.72),
-    );
+fn draw_inspector(game: &Game, rect: Rect, row: &StatRow) {
+    draw_text(row.label, rect.x + 18.0, rect.y + 34.0, 24.0, WHITE);
+    let value_dims = measure_text(&row.value, None, 24, 1.0);
     draw_text(
-        &format!(
-            "{} / {} xp",
-            game.sim.player.stats.xp, game.sim.player.stats.next_xp
-        ),
-        rect.x + 28.0,
-        top + 32.0,
-        15.0,
-        WHITE,
+        &row.value,
+        rect.x + rect.w - value_dims.width - 18.0,
+        rect.y + 34.0,
+        24.0,
+        GOLD,
     );
-    draw_text("Spend", rect.x + 18.0, top + 70.0, 18.0, GOLD);
-}
 
-fn draw_detail_panel(rect: Rect, detail: &str) {
-    let detail_rect = Rect::new(rect.x + 18.0, rect.y + 100.0, rect.w - 36.0, 84.0);
+    let detail_rect = Rect::new(rect.x + 18.0, rect.y + 54.0, rect.w - 36.0, 110.0);
     draw_interior_card(detail_rect, CHROME_GOLD, false);
-    for (index, line) in wrap_text(detail, detail_rect.w - 24.0, 17.0, 3)
+    for (index, line) in wrap_text(&row.detail, detail_rect.w - 24.0, 17.0, 4)
         .iter()
         .enumerate()
     {
@@ -267,6 +251,29 @@ fn draw_detail_panel(rect: Rect, detail: &str) {
             detail_rect.y + 24.0 + index as f32 * 19.0,
             17.0,
             WHITE,
+        );
+    }
+
+    let spending_text = if row.cursor_index.is_some() {
+        if game.sim.player.stats.unspent_stat_points > 0 {
+            "Press Enter to invest 1 point into the selected attribute."
+        } else {
+            "Earn a level to gain more points for Strength, Agility, or Vitality."
+        }
+    } else {
+        "Only Strength, Agility, and Vitality can be raised directly."
+    };
+    draw_text("Spendable", rect.x + 18.0, rect.y + 204.0, 18.0, GOLD);
+    for (index, line) in wrap_text(spending_text, rect.w - 36.0, 17.0, 2)
+        .iter()
+        .enumerate()
+    {
+        draw_text(
+            line,
+            rect.x + 18.0,
+            rect.y + 232.0 + index as f32 * 19.0,
+            17.0,
+            MUTED,
         );
     }
 }

@@ -296,6 +296,7 @@ impl PreviewMode {
             }
             PreviewMode::Character => {
                 game.sim.player.stats.unspent_stat_points = 3;
+                game.runtime.preview_hover_screen = Some(Vec2::new(224.0, 280.0));
                 game.ui.mode = UiMode::Character;
             }
             PreviewMode::SkillBook => {
